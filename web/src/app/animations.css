@@ -1,0 +1,599 @@
+/* ============================================
+   Advanced Motion Design System for SkillLedger
+   Rich & Expressive Visual Enhancement Library
+   ============================================ */
+
+/* Core Animation Variables */
+:root {
+  /* Animation Duration Scale */
+  --duration-instant: 0.15s;
+  --duration-fast: 0.25s;
+  --duration-normal: 0.4s;
+  --duration-slow: 0.6s;
+  --duration-slower: 0.8s;
+  --duration-epic: 1.2s;
+
+  /* Animation Easing Functions */
+  --ease-out-smooth: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-out-back: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-in-out-smooth: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-bounce: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+
+  /* Animation Stagger Delays */
+  --stagger-tiny: 0.05s;
+  --stagger-small: 0.1s;
+  --stagger-medium: 0.15s;
+  --stagger-large: 0.2s;
+  --stagger-huge: 0.3s;
+
+  /* Perspective & Transform Values */
+  --perspective-subtle: 500px;
+  --perspective-medium: 1000px;
+  --perspective-strong: 1500px;
+  --perspective-extreme: 2000px;
+}
+
+/* ============================================
+   Reduced Motion Support (Accessibility)
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================
+   Enhanced Keyframes for Rich Animations
+   ============================================ */
+
+/* Slide & Fade Combinations */
+@keyframes slideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUpEnhanced {
+  0% {
+    opacity: 0;
+    transform: translateY(60px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Scale & Rotation Effects */
+@keyframes scaleRotateIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-180deg);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05) rotate(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes elasticIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 3D Perspective Effects */
+@keyframes flipInX {
+  0% {
+    opacity: 0;
+    transform: perspective(400px) rotateX(90deg);
+  }
+  40% {
+    transform: perspective(400px) rotateX(-10deg);
+  }
+  70% {
+    transform: perspective(400px) rotateX(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(400px) rotateX(0deg);
+  }
+}
+
+@keyframes flipInY {
+  0% {
+    opacity: 0;
+    transform: perspective(400px) rotateY(90deg);
+  }
+  40% {
+    transform: perspective(400px) rotateY(-10deg);
+  }
+  70% {
+    transform: perspective(400px) rotateY(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(400px) rotateY(0deg);
+  }
+}
+
+/* Glow & Pulse Effects */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.4),
+                0 0 40px hsl(var(--primary) / 0.2),
+                0 0 60px hsl(var(--primary) / 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.6),
+                0 0 60px hsl(var(--primary) / 0.3),
+                0 0 90px hsl(var(--primary) / 0.15);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes rotateGradient {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Advanced Float Variations */
+@keyframes float3d {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) rotateX(0deg);
+  }
+  25% {
+    transform: translateY(-15px) translateX(5px) rotateX(2deg);
+  }
+  50% {
+    transform: translateY(-10px) translateX(-3px) rotateX(-1deg);
+  }
+  75% {
+    transform: translateY(-20px) translateX(2px) rotateX(1deg);
+  }
+}
+
+@keyframes pendulum {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+/* Loading & Progress Animations */
+@keyframes progressPulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes skeletonWave {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes countUp {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) translateY(20px);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1) translateY(-5px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Attention & Call-to-Action Animations */
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-3deg);
+  }
+  75% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes heartbeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.1);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes magnet {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* ============================================
+   Animation Utility Classes
+   ============================================ */
+
+/* Entrance Animations */
+.animate-slide-left {
+  animation: slideInLeft var(--duration-normal) var(--ease-out-expo) forwards;
+}
+
+.animate-slide-right {
+  animation: slideInRight var(--duration-normal) var(--ease-out-expo) forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight var(--duration-fast) var(--ease-out-expo) forwards;
+}
+
+.animate-slide-down {
+  animation: slideInDown var(--duration-normal) var(--ease-out-expo) forwards;
+}
+
+.animate-slide-up-enhanced {
+  animation: slideInUpEnhanced var(--duration-slow) var(--ease-out-back) forwards;
+}
+
+.animate-scale-rotate {
+  animation: scaleRotateIn var(--duration-slow) var(--ease-bounce) forwards;
+}
+
+.animate-bounce-in {
+  animation: bounceIn var(--duration-slow) var(--ease-out-expo) forwards;
+}
+
+.animate-elastic-in {
+  animation: elasticIn var(--duration-normal) var(--ease-spring) forwards;
+}
+
+.animate-flip-x {
+  animation: flipInX var(--duration-normal) var(--ease-out-back) forwards;
+  transform-style: preserve-3d;
+}
+
+.animate-flip-y {
+  animation: flipInY var(--duration-normal) var(--ease-out-back) forwards;
+  transform-style: preserve-3d;
+}
+
+/* Continuous Animations */
+.animate-float-3d {
+  animation: float3d 8s var(--ease-in-out-smooth) infinite;
+  transform-style: preserve-3d;
+}
+
+.animate-pendulum {
+  animation: pendulum 4s var(--ease-in-out-smooth) infinite;
+  transform-origin: top center;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 3s var(--ease-in-out-smooth) infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s var(--ease-in-out-smooth) infinite;
+}
+
+.animate-wiggle:hover {
+  animation: wiggle 0.5s var(--ease-out-expo) infinite;
+}
+
+.animate-heartbeat:hover {
+  animation: heartbeat 1s var(--ease-in-out-smooth) infinite;
+}
+
+/* Loading & Progress States */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted) / 0.1) 0%,
+    hsl(var(--muted) / 0.3) 50%,
+    hsl(var(--muted) / 0.1) 100%
+  );
+  background-size: 200px 100%;
+  animation: skeletonWave 1.5s infinite;
+  border-radius: var(--radius);
+}
+
+.progress-pulse {
+  animation: progressPulse 1.5s var(--ease-in-out-smooth) infinite;
+}
+
+.count-up {
+  animation: countUp 0.8s var(--ease-out-back) forwards;
+}
+
+/* ============================================
+   Interactive Animation Classes
+   ============================================ */
+
+/* Hover Effects with Different Intensities */
+.hover-lift {
+  transition: all var(--duration-normal) var(--ease-out-smooth);
+}
+
+.hover-lift:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 40px -10px hsl(var(--primary) / 0.3);
+}
+
+.hover-lift-subtle:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 10px 25px -5px hsl(var(--primary) / 0.2);
+}
+
+.hover-tilt {
+  transition: all var(--duration-normal) var(--ease-out-smooth);
+  transform-style: preserve-3d;
+  transform: perspective(var(--perspective-medium));
+}
+
+.hover-tilt:hover {
+  transform: perspective(var(--perspective-medium)) rotateX(5deg) rotateY(5deg);
+}
+
+.hover-glow {
+  transition: all var(--duration-normal) var(--ease-out-smooth);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.5),
+              0 0 60px hsl(var(--primary) / 0.3);
+}
+
+/* Magnetic Button Effect */
+.magnetic-button {
+  position: relative;
+  transition: all var(--duration-fast) var(--ease-out-smooth);
+}
+
+.magnetic-button:hover {
+  transform: scale(1.05);
+  animation: magnet 0.6s var(--ease-out-smooth) infinite;
+}
+
+/* Focus Enhancements */
+.focus-ring {
+  transition: all var(--duration-fast) var(--ease-out-smooth);
+}
+
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px hsl(var(--primary) / 0.2),
+              0 0 0 2px hsl(var(--primary));
+}
+
+/* ============================================
+   Stagger Animation Utilities
+   ============================================ */
+
+.stagger-children > * {
+  opacity: 0;
+  animation: slideInUpEnhanced var(--duration-normal) var(--ease-out-back) forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: var(--stagger-tiny); }
+.stagger-children > *:nth-child(3) { animation-delay: var(--stagger-small); }
+.stagger-children > *:nth-child(4) { animation-delay: var(--stagger-medium); }
+.stagger-children > *:nth-child(5) { animation-delay: var(--stagger-large); }
+.stagger-children > *:nth-child(6) { animation-delay: var(--stagger-huge); }
+
+.stagger-fade > * {
+  opacity: 0;
+  animation: fadeIn var(--duration-normal) var(--ease-out-smooth) forwards;
+}
+
+.stagger-fade > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-fade > *:nth-child(2) { animation-delay: var(--stagger-tiny); }
+.stagger-fade > *:nth-child(3) { animation-delay: var(--stagger-small); }
+.stagger-fade > *:nth-child(4) { animation-delay: var(--stagger-medium); }
+.stagger-fade > *:nth-child(5) { animation-delay: var(--stagger-large); }
+.stagger-fade > *:nth-child(6) { animation-delay: var(--stagger-huge); }
+
+/* ============================================
+   Performance Optimizations
+   ============================================ */
+
+/* GPU Acceleration for Critical Animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+.animate-3d {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+/* Reduced Performance for Non-Critical Elements */
+.low-performance {
+  will-change: auto;
+}
+
+/* ============================================
+   Scroll-Triggered Animation Classes
+   ============================================ */
+
+.scroll-animate {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all var(--duration-slow) var(--ease-out-smooth);
+}
+
+.scroll-animate.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scroll-animate-left {
+  opacity: 0;
+  transform: translateX(-40px);
+  transition: all var(--duration-slow) var(--ease-out-smooth);
+}
+
+.scroll-animate-left.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.scroll-animate-right {
+  opacity: 0;
+  transform: translateX(40px);
+  transition: all var(--duration-slow) var(--ease-out-smooth);
+}
+
+.scroll-animate-right.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ============================================
+   Skeleton Loading Animations
+   ============================================ */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}

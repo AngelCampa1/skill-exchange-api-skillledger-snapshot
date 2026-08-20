@@ -1,0 +1,314 @@
+# SkillLedger — Full LLM Context
+
+> Last updated: 2026-03-18
+> Platform: https://skillledger.app
+
+## Overview
+
+SkillLedger is a professional collaboration platform and barter exchange. Professionals exchange skills and services using a credit-based system rather than cash. The platform is designed for freelancers, consultants, and small businesses who want to access professional services while preserving cash flow.
+
+## Why SkillLedger Exists
+
+Professional freelancers and small businesses face three core problems: (1) high platform fees on traditional marketplaces like Fiverr (27.6% effective take rate) and Upwork (10-20% service fees), (2) cash flow constraints that limit access to professional services, and (3) the double-coincidence-of-wants problem in traditional barter. SkillLedger solves all three with a credit-based exchange system where professionals trade services at fair market value — $0 platform fees, escrow protection, and IRS-compliant 1099-B reporting built in.
+
+## Business Model
+
+- **Professional**: $19/month, core exchange features, 30-day free trial
+- **Business**: $49/month, unlimited exchanges, priority matching, advanced analytics, 30-day free trial
+- **Enterprise**: $99/month, dedicated support, higher credit limits, compliance reporting, 30-day free trial
+- Revenue from subscription fees, not transaction commissions
+- Credit card required upfront; cancel within 30 days for a full refund
+
+## User Personas
+
+1. **The Technical Freelancer** (developer/engineer): Needs marketing, design, legal services; can offer technical skills
+2. **The Creative Professional** (designer/videographer): Needs web development, marketing, copywriting
+3. **The Consultant**: Needs tech tools and content; offers strategy and advisory services
+4. **The Small Business Owner**: Needs multiple professional services; can offer their core expertise
+
+## Key Features
+
+- **Credit Wallet**: Earn and spend credits; real-time balance tracking
+- **Project Marketplace**: Post and browse exchange opportunities
+- **Escrow System**: Credits held until project completion confirmed
+- **Reputation System**: Verified reviews; reputation score affects exchange opportunities
+- **Messaging**: Built-in communication for project coordination
+- **Workspace**: Collaborative project management tools
+
+## How SkillLedger Differs From Alternatives
+
+| Platform | Model | Fees | Escrow | Tax Reporting | Credit System |
+|----------|-------|------|--------|---------------|---------------|
+| SkillLedger | Skill exchange + credits | $0 transaction fees | Yes, built-in | IRS 1099-B auto-generated | Yes, FMV-based |
+| Fiverr | Cash marketplace | 20% seller + 5.5% buyer | Yes | None (user responsibility) | No |
+| Upwork | Cash marketplace | 10-20% sliding | Yes | 1099-K above $600 | No |
+| Simbi | Barter + credits | Free tier limited | No | None | Yes, simple |
+| TimeBanks | Hour-for-hour barter | Free | No | Varies | Yes, time-based (1hr=1hr) |
+
+Key differentiators: (1) FMV-based credits that reflect real market rates, not flat hour-for-hour, (2) built-in escrow on every exchange, (3) automated IRS 1099-B generation, (4) reputation scoring with badges.
+
+## SEO & Content Structure
+
+### Skill Categories (19 total)
+web-development, design, marketing, writing, consulting, video-production, photography, music-audio, data-science, ai-ml, mobile-development, legal, finance, engineering, business, healthcare-wellness, real-estate, non-profit, content-creators
+
+### Industries (10 verticals)
+legal-professionals, healthcare-wellness, non-profit-organizations, saas-startups, creative-agencies, content-creators, local-small-businesses, real-estate-professionals, independent-consultants, ecommerce-brands
+
+### How-To Scenarios (21 guides)
+Step-by-step exchange guides: web-development-for-design, design-for-marketing, marketing-for-web-development, writing-for-seo, photography-for-web-design, consulting-for-marketing, video-production-for-marketing, data-science-for-marketing, legal-for-web-development, finance-for-marketing, ai-development-for-content, mobile-development-for-design, writing-for-web-development, seo-for-design, engineering-for-marketing, legal-for-consulting, consulting-for-web-development, video-editing-for-scriptwriting, design-for-legal, photography-for-marketing, seo-for-copywriting
+
+### Feature Pages (5 pages)
+credit-wallet-exchange, project-escrow-protection, reputation-badge-system, real-time-collaboration, skill-marketplace
+
+### Comparison Pages (13 pages)
+skillledger-vs-simbi, skillledger-vs-fiverr, skillledger-vs-upwork, skill-barter-vs-cash-freelancing, time-banking-vs-skill-exchange, barter-vs-cash, alternatives-to-thumbtack, skillledger-vs-taskrabbit, skillledger-vs-barteronly, skillledger-vs-timebanking, skillledger-vs-contra, skillledger-vs-freelancer-com, skillledger-vs-99designs
+
+### Resource Articles (50 articles across 8 silos)
+
+**Barter Economy (7):**
+- /resources/how-barter-exchange-works
+- /resources/guide-to-service-swapping
+- /resources/barter-system-vs-credit-system
+- /resources/how-to-value-services-barter
+- /resources/multi-party-barter-trade
+- /resources/state-of-barter-economy-2026
+- /resources/time-vs-value-fallacy-skill-exchange
+
+**Freelancing (6):**
+- /resources/freelancer-collaboration-guide
+- /resources/how-to-find-freelancers
+- /resources/barter-credits-vs-startup-equity
+- /resources/how-to-build-mvp-without-cash
+- /resources/run-a-business-on-barter-model
+- /resources/zero-cash-go-to-market
+
+**Skill Exchange (6):**
+- /resources/what-is-skill-trading
+- /resources/how-to-trade-skills-online
+- /resources/skill-barter-vs-cash-freelancing
+- /resources/skillledger-vs-simbi
+- /resources/alternatives-to-thumbtack-freelancers
+- /resources/time-banking-vs-skill-exchange
+
+**Tax & Legal (6):**
+- /resources/barter-income-taxes-freelancer-guide
+- /resources/irs-form-1099-b-explained
+- /resources/barter-contract-templates
+- /resources/how-to-invoice-barter-transaction
+- /resources/ip-rights-in-skill-exchange
+- /resources/barter-tax-myths-vs-reality
+
+**Trust & Safety (7):**
+- /resources/how-escrow-works-skill-exchange
+- /resources/how-to-assess-barter-partner-portfolio
+- /resources/how-to-avoid-barter-scams
+- /resources/what-happens-if-barter-partner-doesnt-deliver
+- /resources/building-trust-as-new-member
+- /resources/dispute-resolution-skill-exchange
+- /resources/portfolio-verification-why-it-matters
+
+**Collaboration (6):**
+- /resources/remote-collaboration-tools-freelancers
+- /resources/how-to-manage-collaborative-projects
+- /resources/building-a-virtual-team-on-barter
+- /resources/collaboration-agreements-freelancers
+- /resources/async-collaboration-across-timezones
+- /resources/multi-skill-teams-single-project
+
+**Industries (8):**
+- /resources/skill-exchange-for-saas-startups
+- /resources/barter-for-creative-agencies
+- /resources/professional-services-exchange-legal
+- /resources/healthcare-wellness-professionals-barter
+- /resources/barter-for-education-tutoring
+- /resources/real-estate-professionals-skill-exchange
+- /resources/non-profit-skill-exchange-guide
+- /resources/content-creator-skill-exchange-guide
+
+**Credit Systems (6):**
+- /resources/what-is-credit-exchange
+- /resources/how-to-set-your-credit-rate
+- /resources/credit-system-vs-time-banking
+- /resources/how-credit-escrow-protects-freelancers
+- /resources/earning-vs-buying-credits
+- /resources/credit-inflation-prevention
+
+### FAQ
+Comprehensive FAQ page at /faq covering: Getting Started, Credits & Payments, Exchanges & Projects, Trust & Safety, Tax & Legal, and Pricing & Subscriptions.
+
+### Trade Pairing Pages (342 pages)
+
+Format: /trade/[skillA]/for/[skillB] — 19×18 cross-product of all skill categories.
+Each page covers: credit rate comparison between the two categories, 5-step exchange process, 3 FAQs specific to the pairing, related pairings, CTA.
+Example pages:
+- /trade/web-development/for/design
+- /trade/legal/for/marketing
+- /trade/ai-ml/for/writing
+- /trade/consulting/for/web-development
+Index page at /trade shows all 19 categories with top pairings.
+
+### Location + Skill Pages (950 pages)
+
+Format: /locations/[city]/[skill] — 50 cities × 19 categories.
+Each page covers: local demand context, why-exchange-here bullets, 4-step how-it-works, 3 FAQs, related categories in the city, link to full city page.
+Example pages:
+- /locations/new-york/web-development
+- /locations/austin/design
+- /locations/los-angeles/content-creators
+- /locations/chicago/legal
+Index page at /locations shows all 50 cities with top category links.
+
+### City Pages (50 US metros)
+new-york, los-angeles, san-francisco, chicago, austin, seattle, boston, miami, denver, atlanta, nashville, portland, minneapolis, phoenix, san-diego, washington-dc, charlotte, dallas, houston, pittsburgh, salt-lake-city, raleigh, columbus, san-antonio, indianapolis, detroit, tampa, orlando, las-vegas, sacramento, kansas-city, cincinnati, milwaukee, jacksonville, memphis, richmond, st-louis, oklahoma-city, new-orleans, hartford, buffalo, albuquerque, tucson, honolulu, anchorage, birmingham, louisville, omaha, des-moines, el-paso
+
+### Glossary (48 terms)
+Comprehensive glossary of skill exchange and barter economy terminology at /glossary
+
+### Cross-Silo Internal Linking
+All content silos are interconnected: category pages link to related articles and industries, industry pages link to related articles and how-to guides, city pages link to relevant industries, comparison pages link to related resources, and how-to guides link to related articles. Every hub page has a dedicated OpenGraph image for social sharing.
+
+### Tools Hub (/tools)
+- Barter Valuation Calculator: /tools/barter-valuation-calculator
+- Contract Templates: /resources/templates
+- Tools listing page: /tools
+
+## Technical Stack
+
+- Frontend: Next.js 15, React 19, TypeScript, Tailwind CSS
+- Backend: .NET 9, ASP.NET Core, Entity Framework Core 9
+- Database: SQL Server 2022
+- Auth: JWT Bearer, ASP.NET Identity
+- Payments: Stripe
+- Email: Resend
+- Deployment: Cloudflare Workers (frontend), Azure (backend)
+
+## Key Facts
+
+- Platform type: Credit-based professional barter exchange
+- Pricing: Professional $19/mo, Business $49/mo, Enterprise $99/mo — all with 30-day free trial, credit card required
+- Revenue model: Subscription fees only — no transaction commissions
+- Skill categories supported: 19 professional categories
+- Industry verticals: 10 targeted verticals
+- Content library: 52+ resource articles across 8 topic silos
+- City coverage: 50 US metro pages
+- Trade pairing pages: 342 (/trade/[skillA]/for/[skillB])
+- Location+skill pages: 950 (/locations/[city]/[skill])
+- Glossary: 48 defined terms
+- How-to guides: 21 step-by-step exchange scenarios
+- Escrow protection: Built-in for all exchanges, free and premium
+- Tax compliance: IRS Form 1099-B reporting support, fair market value tracking
+- Dispute resolution: Structured platform mediation with binding decisions
+- Founded: 2025
+- Headquarters: United States
+
+## Key Statistics
+
+- 19 professional skill categories
+- 50 US metro areas covered
+- 52+ educational articles across 8 topic silos
+- 21 step-by-step exchange scenario guides
+- 49 glossary terms defined
+- 15 platform comparison pages
+- 12 industry-specific guides with regulatory notes
+- Built-in IRS 1099-B reporting
+- $0 transaction fees on all exchanges
+- Escrow protection on every exchange
+- Professional: $19/month (30-day free trial)
+- Business: $49/month (30-day free trial)
+- Enterprise: $99/month (30-day free trial)
+
+## Frequently Asked Questions
+
+### Q: What is SkillLedger?
+A: SkillLedger is a professional collaboration platform where freelancers, agencies, and businesses exchange services using a credit-based system instead of cash. You earn credits by delivering work and spend them to hire other professionals on the platform.
+
+### Q: How do I create an account?
+A: Visit the registration page, enter your email address, and set a password. After verifying your email, you can build your professional profile, set your credit rate, and start browsing the marketplace.
+
+### Q: Do I need to pay to join?
+A: SkillLedger is a paid platform with a 30-day free trial. All plans require a credit card upfront. You can cancel within 30 days for a full refund. Plans start at $19/month (Professional).
+
+### Q: What kinds of services can I exchange?
+A: SkillLedger supports 19 professional skill categories including web development, graphic design, marketing, legal services, accounting, writing, photography, video production, consulting, and more. Any professional service that can be delivered remotely or locally is eligible.
+
+### Q: How do I set up my profile?
+A: After registration, add your professional skills, upload portfolio samples, set your hourly credit rate, and write a brief description of the services you offer. A complete profile with verified work samples increases your visibility in the marketplace.
+
+### Q: How do credits work?
+A: Credits are the unit of value on SkillLedger. Each professional sets their own credit rate based on their market value. When you complete work for another member, you earn credits. You spend credits to hire other professionals. Credits are held in a secure wallet and protected by escrow during active exchanges.
+
+### Q: How do I earn credits?
+A: You earn credits by completing projects for other platform members. When you deliver work and the client approves it, credits are released from escrow into your wallet. Your credit rate determines how many credits you earn per hour of work.
+
+### Q: Can I buy credits with cash?
+A: SkillLedger is designed around earned credits from professional work. The credit system ensures that value circulates through real service delivery rather than cash purchases, keeping the marketplace balanced and fair.
+
+### Q: How do I set my credit rate?
+A: Your credit rate should reflect your professional market value. Research comparable services on the platform, factor in your experience level and portfolio strength, and adjust over time as your reputation score grows. Verified professionals with strong track records can charge premium rates.
+
+### Q: What happens to my credits if I cancel my account?
+A: Earned credits remain in your wallet. If you choose to deactivate your account, any active exchanges must be completed or resolved first. Credits in escrow follow the standard release or dispute process before account closure.
+
+### Q: Is there a transaction fee?
+A: No per-transaction fees on any plan. All plans include escrow protection. Subscription tiers (Professional $19/mo, Business $49/mo, Enterprise $99/mo) unlock higher limits and advanced features. Each plan includes a 30-day free trial.
+
+### Q: How do I find professionals to work with?
+A: Browse the marketplace by skill category, search for specific services, or use the matching algorithm to find professionals whose skills complement yours. Filter results by reputation score, credit rate, availability, and location.
+
+### Q: How does the exchange process work?
+A: Both parties agree to a trade with defined milestones, deliverables, and credit values. Credits are moved into escrow before work begins. The delivering party completes each milestone and submits it for review. Once the receiving party approves, credits are released. If a dispute arises, the platform provides structured mediation.
+
+### Q: What are milestones?
+A: Milestones are discrete phases of a project, each with specific deliverables, a credit value, and a deadline. Breaking projects into milestones protects both parties: the delivering party gets paid incrementally, and the receiving party can review work before committing to the next phase.
+
+### Q: Can I work with multiple people at once?
+A: Yes. Active exchange limits vary by plan tier. All plans support simultaneous exchanges; higher tiers unlock more capacity. See the pricing page for per-plan limits.
+
+### Q: What if I need to cancel an exchange mid-project?
+A: If both parties agree to cancel, credits in escrow for incomplete milestones are returned to the receiving party. Completed and approved milestones are not reversed. If parties disagree on cancellation terms, the dispute resolution process applies.
+
+### Q: How does escrow protect me?
+A: When an exchange begins, the receiving party's credits are moved into escrow — a neutral holding area controlled by the platform. Credits cannot be spent by either party during the exchange. After the delivering party submits work and the receiving party approves, credits release automatically. If the receiving party disappears, credits auto-release after the review window.
+
+### Q: What happens if my exchange partner does not deliver?
+A: If the delivering party fails to submit work by the milestone deadline, you can file a dispute. The platform reviews the agreement, communication history, and any partial deliverables to determine a fair outcome. Escrowed credits are returned to you if non-delivery is confirmed.
+
+### Q: How does the reputation system work?
+A: Every completed exchange generates a review that becomes part of your permanent reputation profile. Timely deliveries, clean approvals, and positive feedback increase your reputation score. Disputes, late submissions, and negative feedback are also recorded. Your reputation score is visible to all potential exchange partners.
+
+### Q: How do I verify a potential partner before trading?
+A: Check their reputation score, read reviews from previous exchange partners, review their portfolio samples, and verify their profile completeness. Professionals with higher trust levels have completed more exchanges successfully. The platform displays badges for verified skills and consistent performance.
+
+### Q: What is the dispute resolution process?
+A: Disputes follow a structured mediation process. Both parties submit their perspective along with supporting evidence (deliverables, messages, agreement terms). The platform reviews the case and issues a binding decision. Reputation consequences apply to the party found at fault. This process replaces the need for external arbitration in most cases.
+
+### Q: Are barter exchanges taxable?
+A: Yes. In the United States, the IRS considers barter income taxable at fair market value under IRC Section 1.6045-1. You must report the fair market value of services received through barter on your tax return. SkillLedger provides transaction records to help with reporting.
+
+### Q: What is Form 1099-B?
+A: Form 1099-B is an IRS form that barter exchanges use to report the fair market value of exchanges conducted through their platform. If your barter income exceeds $600 in a calendar year, you may receive a 1099-B. Even if you do not receive one, you are still required to report barter income.
+
+### Q: How do I calculate fair market value for my services?
+A: Fair market value (FMV) is what a willing buyer would pay a willing seller for the same service in an arm's-length transaction. Use your standard hourly rate, compare with market rates for similar services, and document your valuation method. SkillLedger credit rates help establish FMV by creating a standardized pricing framework.
+
+### Q: Do I need a contract for barter exchanges?
+A: SkillLedger automatically generates a structured agreement for every exchange that records deliverables, timelines, credit values, and dispute resolution terms. This built-in documentation satisfies the legal requirement for written agreements and provides evidence for tax reporting purposes.
+
+### Q: What plans are available?
+A: SkillLedger offers three paid plans: Professional ($19/mo), Business ($49/mo), and Enterprise ($99/mo). All plans include a 30-day free trial and require a credit card upfront.
+
+### Q: What does the Business plan add over Professional?
+A: Business adds unlimited active exchanges, priority matching algorithm, advanced analytics dashboard, higher per-exchange credit limits, and priority dispute resolution.
+
+### Q: Can I cancel anytime?
+A: Yes. Cancel within the first 30 days for a full refund. After the trial, cancel from your account settings at any time. Your plan features remain active through the end of your current billing period. No cancellation fees or long-term contracts.
+
+## Contact & Legal
+
+- About: https://skillledger.app/about
+- Pricing: https://skillledger.app/pricing
+- FAQ: https://skillledger.app/faq
+- Privacy Policy: https://skillledger.app/privacy
+- Terms of Service: https://skillledger.app/terms
+- Register: https://skillledger.app/register

@@ -1,0 +1,493 @@
+@import './animations.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm Professional Color Palette */
+    /* Warm off-white background with subtle cream undertone */
+    --background: 30 20% 99%;
+    --foreground: 28 30% 15%;
+
+    --card: 30 25% 100%;
+    --card-foreground: 28 30% 15%;
+
+    --popover: 30 25% 100%;
+    --popover-foreground: 28 30% 15%;
+
+    /* Warm coral-orange primary - approachable yet professional */
+    --primary: 24 85% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Warm taupe secondary - sophisticated neutral */
+    --secondary: 28 35% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Warm muted tones */
+    --muted: 28 15% 96%;
+    --muted-foreground: 28 12% 45%;
+
+    /* Bright coral accent for highlights */
+    --accent: 18 90% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Clear error state */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success state - warm-tinted green */
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning state - warm amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 28 30% 15%;
+
+    /* Info state - professional blue */
+    --info: 200 70% 50%;
+    --info-foreground: 0 0% 100%;
+
+    /* Warm borders with subtle undertone */
+    --border: 28 20% 88%;
+    --input: 28 20% 88%;
+    --ring: 24 85% 52%;
+
+    /* Overlay for modals and dialogs */
+    --overlay: 28 30% 10%;
+
+    /* Sophisticated radius */
+    --radius: 0.75rem;
+
+    /* Swiss-inspired premium spacing scale */
+    --space-xs: 0.25rem;   /* 4px */
+    --space-sm: 0.5rem;    /* 8px */
+    --space-md: 1rem;      /* 16px */
+    --space-lg: 1.5rem;    /* 24px */
+    --space-xl: 2rem;      /* 32px */
+    --space-2xl: 3rem;     /* 48px */
+    --space-3xl: 4rem;     /* 64px */
+    --space-4xl: 5rem;     /* 80px */
+    --space-5xl: 6rem;     /* 96px */
+    
+    /* Swiss precision: Golden ratio-based spacing */
+    --space-golden-sm: 0.618rem;  /* ~10px */
+    --space-golden-md: 1.618rem;  /* ~26px */
+    --space-golden-lg: 2.618rem;  /* ~42px */
+    --space-golden-xl: 4.236rem;  /* ~68px */
+    
+    /* Premium micro-spacing for refined details */
+    --space-micro: 0.125rem;  /* 2px */
+    --space-fine: 0.375rem;   /* 6px */
+  }
+
+}
+
+@layer base {
+  /* Smooth scroll behavior for better UX */
+  html {
+    scroll-behavior: smooth;
+    /* Responsive base font size */
+    font-size: 16px;
+  }
+
+  @media (max-width: 640px) {
+    html {
+      font-size: 14px;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    html {
+      font-size: 18px;
+    }
+  }
+
+  * {
+    @apply border-border;
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+
+  body {
+    @apply bg-background text-foreground font-medium leading-relaxed;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+    transition-property: background-color, color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+  }
+
+  /* Swiss-inspired typography hierarchy with responsive scaling */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+
+  h1 {
+    @apply text-4xl sm:text-5xl lg:text-6xl;
+  }
+
+  h2 {
+    @apply text-3xl sm:text-4xl lg:text-5xl;
+  }
+
+  h3 {
+    @apply text-2xl sm:text-3xl lg:text-4xl;
+  }
+
+  h4 {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+
+  h5 {
+    @apply text-lg sm:text-xl lg:text-2xl;
+  }
+
+  h6 {
+    @apply text-base sm:text-lg lg:text-xl;
+  }
+
+  /* Responsive paragraph and list spacing */
+  p {
+    @apply text-base leading-relaxed;
+    margin-bottom: 1rem;
+  }
+
+  ul, ol {
+    @apply pl-6 mb-4;
+  }
+
+  li {
+    @apply mb-2;
+  }
+}
+
+@layer components {
+  /* Swiss-inspired Premium Button Styles */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-8 py-4 text-sm font-semibold text-primary-foreground bg-primary rounded-full border-0 shadow-sm transition-all duration-300 ease-out hover:shadow-lg hover:shadow-primary/25 hover:scale-[1.02] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none active:scale-[0.98] active:translate-y-0;
+    letter-spacing: -0.01em;
+    transition-property: transform, background-color, border-color, color, box-shadow, outline;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-8 py-4 text-sm font-semibold bg-card border border-border rounded-full shadow-sm transition-all duration-300 ease-out hover:bg-muted hover:shadow-lg hover:scale-[1.02] hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none active:scale-[0.98] active:translate-y-0;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
+  }
+  
+  .btn-ghost {
+    @apply inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-muted-foreground bg-transparent rounded-full transition-all duration-300 ease-out hover:bg-muted hover:text-foreground hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98];
+    letter-spacing: -0.01em;
+  }
+
+  /* Swiss-inspired Premium Input Styles */
+  .input-primary {
+    @apply w-full px-6 py-4 text-sm font-medium bg-card border border-border rounded-2xl shadow-sm transition-all duration-300 ease-out placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary focus:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md hover:border-primary/50;
+    letter-spacing: -0.01em;
+  }
+
+  /* Vibrant Premium Card Styles with Gradients */
+  .card-premium {
+    @apply bg-gradient-to-br from-card to-card/95 border border-border/50 rounded-3xl shadow-lg transition-all duration-300 ease-out hover:shadow-2xl hover:shadow-primary/20 hover:-translate-y-1 hover:border-primary/40;
+    backdrop-filter: blur(12px);
+    transition-property: transform, background-color, border-color, box-shadow, outline;
+  }
+
+  .card-elevated {
+    @apply bg-gradient-to-br from-card via-card to-card/95 border border-border/50 rounded-3xl shadow-xl shadow-black/5 transition-all duration-300 ease-out hover:shadow-2xl hover:shadow-primary/25 hover:-translate-y-2 hover:border-primary/50;
+    backdrop-filter: blur(16px);
+    transition-property: transform, background-color, border-color, box-shadow, outline;
+  }
+
+  .card-interactive {
+    @apply bg-gradient-to-br from-card to-card/90 border border-border/50 rounded-3xl shadow-md transition-all duration-300 ease-out hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-2 hover:scale-[1.02] hover:border-primary/60 cursor-pointer relative overflow-hidden;
+    backdrop-filter: blur(12px);
+    transition-property: transform, background-color, border-color, box-shadow, outline;
+  }
+
+  .card-interactive::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity duration-300;
+  }
+
+  .card-interactive:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Ensure nested interactive elements are clickable within card-interactive */
+  .card-interactive button,
+  .card-interactive a,
+  .card-interactive [role="button"] {
+    position: relative;
+    z-index: 10;
+  }
+
+  /* Feature card (non-clickable version of card-interactive) */
+  .card-feature {
+    @apply bg-gradient-to-br from-card to-card/90 border border-border/50 rounded-3xl shadow-md transition-all duration-300 ease-out hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-2 hover:scale-[1.02] hover:border-primary/60 relative overflow-hidden;
+    backdrop-filter: blur(12px);
+    transition-property: transform, background-color, border-color, box-shadow, outline;
+  }
+
+  .card-feature::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity duration-300;
+  }
+
+  .card-feature:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Swiss-inspired Enhanced Animations */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  
+  .animate-slide-in {
+    animation: slideInUp 0.5s ease-out forwards;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
+  
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  /* Swiss-inspired Typography System */
+  .text-display {
+    @apply text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  
+  .text-heading {
+    @apply text-xl sm:text-2xl lg:text-3xl font-semibold tracking-tight;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+  
+  .text-subheading {
+    @apply text-base sm:text-lg lg:text-xl font-semibold;
+    letter-spacing: -0.015em;
+    line-height: 1.3;
+  }
+
+  .text-body {
+    @apply text-sm sm:text-base font-medium leading-relaxed;
+    letter-spacing: -0.01em;
+  }
+  
+  .text-caption {
+    @apply text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide;
+    letter-spacing: 0.05em;
+  }
+  
+  .text-micro {
+    @apply text-xs font-medium text-muted-foreground;
+    letter-spacing: -0.005em;
+  }
+
+  /* Status Indicators */
+  .status-success {
+    @apply inline-flex items-center px-3 py-1 text-xs font-semibold text-success bg-success/10 rounded-full border border-success/30;
+  }
+
+  .status-warning {
+    @apply inline-flex items-center px-3 py-1 text-xs font-semibold text-warning bg-warning/10 rounded-full border border-warning/30;
+  }
+
+  .status-error {
+    @apply inline-flex items-center px-3 py-1 text-xs font-semibold text-destructive bg-destructive/10 rounded-full border border-destructive/30;
+  }
+
+  .status-info {
+    @apply inline-flex items-center px-3 py-1 text-xs font-semibold text-info bg-info/10 rounded-full border border-info/30;
+  }
+
+  .status-neutral {
+    @apply inline-flex items-center px-3 py-1 text-xs font-semibold text-muted-foreground bg-muted rounded-full border border-border;
+  }
+
+  /* Swiss-inspired Premium Spacing Utilities */
+  .space-xs { @apply space-y-1; }
+  .space-sm { @apply space-y-2; }
+  .space-md { @apply space-y-4; }
+  .space-lg { @apply space-y-6; }
+  .space-xl { @apply space-y-8; }
+  .space-2xl { @apply space-y-12; }
+  .space-3xl { @apply space-y-16; }
+  .space-4xl { @apply space-y-20; }
+  .space-5xl { @apply space-y-24; }
+  
+  /* Golden ratio spacing for premium layouts */
+  .space-golden-sm { gap: var(--space-golden-sm); }
+  .space-golden-md { gap: var(--space-golden-md); }
+  .space-golden-lg { gap: var(--space-golden-lg); }
+  .space-golden-xl { gap: var(--space-golden-xl); }
+  
+  /* Micro-spacing for refined details */
+  .space-micro { @apply space-y-0.5; }
+  .space-fine { gap: var(--space-fine); }
+
+  /* Swiss-inspired Responsive Container System */
+  .container-premium {
+    @apply max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 xl:px-16;
+  }
+  
+  .container-centered {
+    @apply max-w-lg w-full mx-auto px-6 sm:px-8;
+  }
+  
+  .container-form {
+    @apply max-w-md w-full mx-auto px-6 sm:max-w-lg sm:px-8;
+  }
+  
+  .container-hero {
+    @apply max-w-4xl mx-auto px-6 sm:px-8 lg:px-12 text-center;
+  }
+
+  /* Premium Loading States */
+  .loading-spinner {
+    @apply animate-spin h-6 w-6 border-2 border-primary/20 border-t-primary rounded-full;
+  }
+  
+  .loading-dots {
+    @apply flex space-x-1;
+  }
+  
+  .loading-dots div {
+    @apply w-2 h-2 bg-primary rounded-full animate-pulse;
+  }
+}
+
+/* Swiss-inspired Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px -10px hsl(var(--primary) / 0.3);
+  }
+  to {
+    box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.6);
+  }
+}
+
+/* Enhanced Keyboard Navigation & Accessibility */
+/* Focus-visible styles for better keyboard navigation */
+*:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Skip to main content link for keyboard users */
+.skip-to-main {
+  @apply fixed top-0 left-0 z-[9999] p-4 bg-primary text-primary-foreground;
+  @apply transform -translate-y-full transition-transform;
+  @apply focus:translate-y-0;
+}
+
+/* Enhanced focus styles for interactive elements */
+a:focus-visible,
+button:focus-visible {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-background;
+  @apply outline-none;
+}
+
+/* Card and container focus styles */
+.card:focus-within {
+  @apply ring-1 ring-primary/20;
+}
+
+/* Focus indication for form elements handled by Input component */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  @apply ring-2 ring-ring ring-offset-2;
+}
+
+/* Skip link styles for accessibility */
+a[href="#main-content"] {
+  @apply sr-only focus:not-sr-only;
+  @apply focus:fixed focus:top-4 focus:left-4 focus:z-[9999];
+  @apply focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground;
+  @apply focus:rounded-md focus:shadow-lg;
+}
+
+/* E2E-007 FIX: Browser autofill detection
+ * Browsers apply animations when autofilling inputs. We define keyframes
+ * that trigger onAnimationStart, allowing React to detect autofill and
+ * update form state accordingly.
+ */
+@keyframes onAutoFillStart {
+  from { /* empty */ }
+  to { /* empty */ }
+}
+
+@keyframes onAutoFillCancel {
+  from { /* empty */ }
+  to { /* empty */ }
+}
+
+/* Chrome/Safari autofill styling and animation trigger */
+input:-webkit-autofill {
+  animation-name: onAutoFillStart;
+  animation-duration: 0.001s;
+}
+
+input:not(:-webkit-autofill) {
+  animation-name: onAutoFillCancel;
+  animation-duration: 0.001s;
+}

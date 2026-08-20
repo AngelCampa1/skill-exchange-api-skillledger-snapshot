@@ -1,0 +1,719 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Stripe;
+using SkillLedger.Core.Interfaces;
+using SkillLedger.Infrastructure.Configuration;
+using System.Security.Cryptography;
+using System.Text;
+using Newtonsoft.Json;
+
+namespace SkillLedger.Infrastructure.Services;
+
+/// <summary>
+/// Service for processing Stripe webhook events
+/// </summary>
+public class StripeWebhookService
+{
+    private readonly ILogger<StripeWebhookService> _logger;
+    private readonly StripeSettings _stripeSettings;
+    private readonly ISubscriptionService _subscriptionService;
+    private readonly IAuditLogService _auditLogService;
+    private readonly IEmailService _emailService;
+
+    public StripeWebhookService(
+        ILogger<StripeWebhookService> logger,
+        IOptions<StripeSettings> stripeSettings,
+        ISubscriptionService subscriptionService,
+        IAuditLogService auditLogService,
+        IEmailService emailService)
+    {
+        _logger = logger;
+        _stripeSettings = stripeSettings.Value;
+        _subscriptionService = subscriptionService;
+        _auditLogService = auditLogService;
+        _emailService = emailService;
+    }
+
+    /// <summary>
+    /// Process incoming Stripe webhook event
+    /// </summary>
+    /// <param name="jsonPayload">Raw webhook payload</param>
+    /// <param name="stripeSignature">Stripe signature header for verification</param>
+    /// <returns>True if processing was successful</returns>
+    public async Task<bool> ProcessWebhookAsync(string jsonPayload, string stripeSignature)
+    {
+        try
+        {
+            _logger.LogInformation("Processing Stripe webhook");
+
+            if (!_stripeSettings.IsEnabled)
+            {
+                _logger.LogWarning("Stripe webhooks are disabled in configuration");
+                return false;
+            }
+
+            // Verify webhook signature
+            if (!await VerifyWebhookSignatureAsync(jsonPayload, stripeSignature))
+            {
+                _logger.LogError("Webhook signature verification failed");
+                await _auditLogService.LogEventAsync(
+                    null,
+                    "WEBHOOK_SIGNATURE_VERIFICATION_FAILED",
+                    "Unknown",
+                    "Stripe Webhook Service",
+                    false,
+                    $"Webhook signature verification failed. Signature: {stripeSignature?.Substring(0, Math.Min(20, stripeSignature?.Length ?? 0))}...");
+                return false;
+            }
+
+            // Parse the event
+            var stripeEvent = EventUtility.ParseEvent(jsonPayload);
+            _logger.LogInformation("Processing Stripe event type: {EventType}", stripeEvent.Type);
+
+            // Process the event based on type
+            var result = stripeEvent.Type switch
+            {
+                // Subscription events
+                "customer.subscription.created" => await HandleSubscriptionCreatedAsync(stripeEvent),
+                "customer.subscription.updated" => await HandleSubscriptionUpdatedAsync(stripeEvent),
+                "customer.subscription.deleted" => await HandleSubscriptionDeletedAsync(stripeEvent),
+                "customer.subscription.trial_will_end" => await HandleTrialWillEndAsync(stripeEvent),
+
+                // Invoice events
+                "invoice.payment_succeeded" => await HandleInvoicePaymentSucceededAsync(stripeEvent),
+                "invoice.payment_failed" => await HandleInvoicePaymentFailedAsync(stripeEvent),
+                "invoice.upcoming" => await HandleInvoiceUpcomingAsync(stripeEvent),
+
+                // Payment method events
+                "payment_method.attached" => await HandlePaymentMethodAttachedAsync(stripeEvent),
+                "payment_method.detached" => await HandlePaymentMethodDetachedAsync(stripeEvent),
+
+                // Customer events
+                "customer.created" => await HandleCustomerCreatedAsync(stripeEvent),
+                "customer.updated" => await HandleCustomerUpdatedAsync(stripeEvent),
+                "customer.deleted" => await HandleCustomerDeletedAsync(stripeEvent),
+
+                // Checkout session events
+                "checkout.session.completed" => await HandleCheckoutSessionCompletedAsync(stripeEvent),
+
+                _ => await HandleUnknownEventAsync(stripeEvent)
+            };
+
+            if (result)
+            {
+                _logger.LogInformation("Successfully processed Stripe event: {EventType}", stripeEvent.Type);
+                await _auditLogService.LogEventAsync(
+                    null,
+                    "WEBHOOK_PROCESSED",
+                    "Unknown",
+                    "Stripe Webhook Service",
+                    true,
+                    $"Successfully processed Stripe event: {stripeEvent.Type}");
+            }
+            else
+            {
+                _logger.LogError("Failed to process Stripe event: {EventType}", stripeEvent.Type);
+                await _auditLogService.LogEventAsync(
+                    null,
+                    "WEBHOOK_PROCESSING_FAILED",
+                    "Unknown",
+                    "Stripe Webhook Service",
+                    false,
+                    $"Failed to process Stripe event: {stripeEvent.Type}");
+            }
+
+            return result;
+        }
+        catch (StripeException ex)
+        {
+            _logger.LogError(ex, "Stripe error while processing webhook");
+            await _auditLogService.LogEventAsync(
+                null,
+                "WEBHOOK_STRIPE_ERROR",
+                "Unknown",
+                "Stripe Webhook Service",
+                false,
+                $"Stripe error: {ex.Message}",
+                ex.ToString());
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while processing Stripe webhook");
+            await _auditLogService.LogEventAsync(
+                null,
+                "WEBHOOK_UNEXPECTED_ERROR",
+                "Unknown",
+                "Stripe Webhook Service",
+                false,
+                $"Unexpected error: {ex.Message}",
+                ex.ToString());
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Verify webhook signature using Stripe's recommended method
+    /// </summary>
+    private async Task<bool> VerifyWebhookSignatureAsync(string jsonPayload, string stripeSignature)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_stripeSettings.WebhookSecret))
+            {
+                _logger.LogWarning("Webhook secret not configured - skipping signature verification");
+                return true; // Allow in development/test mode
+            }
+
+            var expectedSignature = stripeSignature;
+            if (string.IsNullOrEmpty(expectedSignature))
+            {
+                _logger.LogError("Stripe signature header is missing");
+                return false;
+            }
+
+            // Use Stripe's built-in verification
+            var webhookConstructedEvent = Webhook.ConstructEvent(
+                jsonPayload,
+                expectedSignature,
+                _stripeSettings.WebhookSecret);
+
+            // If we get here without exception, signature is valid
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Webhook signature verification failed");
+            return false;
+        }
+    }
+
+    #region Subscription Event Handlers
+
+    private async Task<bool> HandleSubscriptionCreatedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var subscription = stripeEvent.Data.Object as Stripe.Subscription;
+            if (subscription == null)
+            {
+                _logger.LogError("Invalid subscription data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Subscription created: {SubscriptionId} for customer: {CustomerId}",
+                subscription.Id, subscription.CustomerId);
+
+            // Find the user associated with this Stripe customer
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(subscription.Id);
+            if (userSubscription != null)
+            {
+                _logger.LogInformation("Subscription {SubscriptionId} already exists in system", subscription.Id);
+                return true;
+            }
+
+            // This event is handled when creating subscriptions via Checkout Session
+            // The actual subscription creation happens in HandleCheckoutSessionCompletedAsync
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling subscription created event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleSubscriptionUpdatedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var subscription = stripeEvent.Data.Object as Stripe.Subscription;
+            if (subscription == null)
+            {
+                _logger.LogError("Invalid subscription data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Subscription updated: {SubscriptionId}, status: {Status}",
+                subscription.Id, subscription.Status);
+
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(subscription.Id);
+            if (userSubscription == null)
+            {
+                _logger.LogWarning("No subscription found for Stripe subscription: {SubscriptionId}", subscription.Id);
+                return false;
+            }
+
+            // Update local subscription status based on Stripe status
+            var status = subscription.Status switch
+            {
+                "trialing" => Core.Enums.SubscriptionStatus.Trial,
+                "active" => Core.Enums.SubscriptionStatus.Active,
+                "past_due" => Core.Enums.SubscriptionStatus.PastDue,
+                "canceled" => Core.Enums.SubscriptionStatus.Cancelled,
+                "unpaid" => Core.Enums.SubscriptionStatus.PastDue,
+                _ => Core.Enums.SubscriptionStatus.Inactive
+            };
+
+            // Note: UpdateSubscriptionStatusAsync would need to be added to ISubscriptionService
+            // For now, just log the status change
+            _logger.LogInformation("Subscription {SubscriptionId} status changed to {Status}", subscription.Id, status);
+
+            // Handle specific status changes
+            if (subscription.Status == "past_due")
+            {
+                await HandlePastDueSubscriptionAsync(userSubscription.UserId, subscription);
+            }
+            else if (subscription.Status == "canceled")
+            {
+                await HandleCancelledSubscriptionAsync(userSubscription.UserId, subscription);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling subscription updated event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleSubscriptionDeletedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var subscription = stripeEvent.Data.Object as Stripe.Subscription;
+            if (subscription == null)
+            {
+                _logger.LogError("Invalid subscription data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Subscription deleted: {SubscriptionId}", subscription.Id);
+
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(subscription.Id);
+            if (userSubscription == null)
+            {
+                _logger.LogWarning("No subscription found for Stripe subscription: {SubscriptionId}", subscription.Id);
+                return false;
+            }
+
+            await _subscriptionService.CancelSubscriptionAsync(userSubscription.UserId, "Deleted via Stripe", immediate: true);
+
+            // Send cancellation confirmation email
+            await SendGenericEmailAsync(userSubscription.UserId, "Subscription Cancelled",
+                "Your subscription has been cancelled. You can reactivate it anytime from your dashboard.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling subscription deleted event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleTrialWillEndAsync(Event stripeEvent)
+    {
+        try
+        {
+            var subscription = stripeEvent.Data.Object as Stripe.Subscription;
+            if (subscription == null)
+            {
+                _logger.LogError("Invalid subscription data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Trial ending soon for subscription: {SubscriptionId}", subscription.Id);
+
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(subscription.Id);
+            if (userSubscription == null)
+            {
+                _logger.LogWarning("No subscription found for Stripe subscription: {SubscriptionId}", subscription.Id);
+                return false;
+            }
+
+            // Send trial ending reminder email
+            await SendGenericEmailAsync(userSubscription.UserId, "Your Trial is Ending Soon",
+                $"Your free trial will end on {subscription.TrialEnd:yyyy-MM-dd}. Upgrade to continue enjoying premium features.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling trial will end event");
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Invoice Event Handlers
+
+    private async Task<bool> HandleInvoicePaymentSucceededAsync(Event stripeEvent)
+    {
+        try
+        {
+            var invoice = stripeEvent.Data.Object as Invoice;
+            if (invoice == null)
+            {
+                _logger.LogError("Invalid invoice data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Invoice payment succeeded: {InvoiceId} for subscription: {SubscriptionId}",
+                invoice.Id, invoice.SubscriptionId);
+
+            if (string.IsNullOrEmpty(invoice.SubscriptionId))
+            {
+                _logger.LogInformation("Invoice is not associated with a subscription, skipping");
+                return true;
+            }
+
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(invoice.SubscriptionId);
+            if (userSubscription == null)
+            {
+                _logger.LogWarning("No subscription found for Stripe subscription: {SubscriptionId}", invoice.SubscriptionId);
+                return true;
+            }
+
+            // Log successful payment
+            _logger.LogInformation("Payment of {Amount} succeeded for user {UserId}",
+                invoice.AmountPaid, userSubscription.UserId);
+
+            // Send payment confirmation email
+            await SendGenericEmailAsync(userSubscription.UserId, "Payment Successful",
+                $"Your payment of ${invoice.AmountPaid / 100m:F2} was successful. Thank you for your continued support!");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling invoice payment succeeded event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleInvoicePaymentFailedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var invoice = stripeEvent.Data.Object as Invoice;
+            if (invoice == null)
+            {
+                _logger.LogError("Invalid invoice data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Invoice payment failed: {InvoiceId} for subscription: {SubscriptionId}",
+                invoice.Id, invoice.SubscriptionId);
+
+            if (string.IsNullOrEmpty(invoice.SubscriptionId))
+            {
+                _logger.LogInformation("Invoice is not associated with a subscription, skipping");
+                return true;
+            }
+
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(invoice.SubscriptionId);
+            if (userSubscription == null)
+            {
+                _logger.LogWarning("No subscription found for Stripe subscription: {SubscriptionId}", invoice.SubscriptionId);
+                return true;
+            }
+
+            // Log failed payment
+            _logger.LogWarning("Payment failed for user {UserId}, attempt {AttemptCount}",
+                userSubscription.UserId, invoice.AttemptCount);
+
+            // Send payment failure notification
+            await SendGenericEmailAsync(userSubscription.UserId, "Payment Failed",
+                $"We were unable to process your payment. Please update your payment method to avoid service interruption.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling invoice payment failed event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleInvoiceUpcomingAsync(Event stripeEvent)
+    {
+        try
+        {
+            var invoice = stripeEvent.Data.Object as Invoice;
+            if (invoice == null)
+            {
+                _logger.LogError("Invalid invoice data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Upcoming invoice: {InvoiceId} for subscription: {SubscriptionId}",
+                invoice.Id, invoice.SubscriptionId);
+
+            if (string.IsNullOrEmpty(invoice.SubscriptionId))
+            {
+                return true;
+            }
+
+            var userSubscription = await _subscriptionService.GetSubscriptionByExternalIdAsync(invoice.SubscriptionId);
+            if (userSubscription == null)
+            {
+                return true;
+            }
+
+            // Send upcoming payment reminder
+            await SendGenericEmailAsync(userSubscription.UserId, "Upcoming Payment",
+                $"Your next payment of ${invoice.AmountDue / 100m:F2} will be processed on {invoice.DueDate:yyyy-MM-dd}.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling invoice upcoming event");
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Payment Method Event Handlers
+
+    private async Task<bool> HandlePaymentMethodAttachedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var paymentMethod = stripeEvent.Data.Object as PaymentMethod;
+            if (paymentMethod == null)
+            {
+                return false;
+            }
+
+            _logger.LogInformation("Payment method attached: {PaymentMethodId} to customer: {CustomerId}",
+                paymentMethod.Id, paymentMethod.CustomerId);
+
+            // Payment methods are typically handled through the API, not webhooks
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling payment method attached event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandlePaymentMethodDetachedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var paymentMethod = stripeEvent.Data.Object as PaymentMethod;
+            if (paymentMethod == null)
+            {
+                return false;
+            }
+
+            _logger.LogInformation("Payment method detached: {PaymentMethodId}", paymentMethod.Id);
+
+            // Remove local reference to this payment method
+            // This would need implementation in PaymentService
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling payment method detached event");
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Customer Event Handlers
+
+    private async Task<bool> HandleCustomerCreatedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var customer = stripeEvent.Data.Object as Customer;
+            if (customer == null)
+            {
+                return false;
+            }
+
+            _logger.LogInformation("Customer created: {CustomerId}", customer.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling customer created event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleCustomerUpdatedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var customer = stripeEvent.Data.Object as Customer;
+            if (customer == null)
+            {
+                return false;
+            }
+
+            _logger.LogInformation("Customer updated: {CustomerId}", customer.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling customer updated event");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleCustomerDeletedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var customer = stripeEvent.Data.Object as Customer;
+            if (customer == null)
+            {
+                return false;
+            }
+
+            _logger.LogInformation("Customer deleted: {CustomerId}", customer.Id);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling customer deleted event");
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Checkout Session Event Handlers
+
+    private async Task<bool> HandleCheckoutSessionCompletedAsync(Event stripeEvent)
+    {
+        try
+        {
+            var session = stripeEvent.Data.Object as Stripe.Checkout.Session;
+            if (session == null)
+            {
+                _logger.LogError("Invalid checkout session data in webhook");
+                return false;
+            }
+
+            _logger.LogInformation("Checkout session completed: {SessionId}", session.Id);
+
+            // Check if this session is for a subscription
+            if (string.IsNullOrEmpty(session.SubscriptionId))
+            {
+                _logger.LogInformation("Checkout session is not for a subscription, skipping");
+                return true;
+            }
+
+            // Get user ID from metadata
+            if (!session.Metadata.TryGetValue("userId", out var userIdString) ||
+                !Guid.TryParse(userIdString, out var userId))
+            {
+                _logger.LogError("User ID not found in checkout session metadata");
+                return false;
+            }
+
+            // Get tier ID from metadata
+            if (!session.Metadata.TryGetValue("tierId", out var tierIdString) ||
+                !Guid.TryParse(tierIdString, out var tierId))
+            {
+                _logger.LogError("Tier ID not found in checkout session metadata");
+                return false;
+            }
+
+            // This would need to be implemented in SubscriptionService
+            // For now, just log the successful checkout
+            _logger.LogInformation("Successfully completed checkout for subscription {SubscriptionId} for user {UserId}",
+                session.SubscriptionId, userId);
+
+            // Send subscription confirmation email
+            await SendGenericEmailAsync(userId, "Subscription Activated",
+                "Welcome to SkillLedger! Your subscription has been successfully activated. Enjoy all premium features.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling checkout session completed event");
+            return false;
+        }
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private async Task<bool> HandleUnknownEventAsync(Event stripeEvent)
+    {
+        _logger.LogInformation("Received unhandled Stripe event type: {EventType}", stripeEvent.Type);
+        return true; // Don't fail for unknown events
+    }
+
+    private async Task<bool> HandlePastDueSubscriptionAsync(Guid userId, Stripe.Subscription subscription)
+    {
+        try
+        {
+            _logger.LogInformation("Handling past due subscription for user {UserId}", userId);
+
+            // Send payment failure notification
+            await SendGenericEmailAsync(userId, "Payment Issue",
+                "We were unable to process your recent payment. Please update your payment method to continue enjoying premium features.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling past due subscription");
+            return false;
+        }
+    }
+
+    private async Task<bool> HandleCancelledSubscriptionAsync(Guid userId, Stripe.Subscription subscription)
+    {
+        try
+        {
+            _logger.LogInformation("Handling cancelled subscription for user {UserId}", userId);
+
+            // Send cancellation confirmation with reactivation offer
+            await SendGenericEmailAsync(userId, "Subscription Cancelled",
+                "Your subscription has been cancelled. You can reactivate it anytime from your dashboard to continue enjoying premium features.");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling cancelled subscription");
+            return false;
+        }
+    }
+
+    private async Task SendGenericEmailAsync(Guid userId, string subject, string message)
+    {
+        try
+        {
+            // Note: This would need the user's email address
+            // For now, we'll just log the email that would be sent
+            _logger.LogInformation("Would send email to user {UserId}: Subject={Subject}, Message={Message}",
+                userId, subject, message);
+
+            // In a real implementation, you would:
+            // 1. Get the user's email from the database
+            // 2. Call _emailService.SendEmailAsync(userEmail, subject, message)
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending generic email to user {UserId}", userId);
+        }
+    }
+
+    #endregion
+}

@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 490" width="960" height="490" role="img" aria-label="Diagram of the SkillLedger credit path. A transfer request enters CreditWalletService, which opens a Serializable database transaction, decrypts both wallet balances, compares them in C-sharp rather than SQL, writes a signed transaction row, and re-encrypts both balances. Two keys feed the process: the AES-256-GCM data key used by the decrypt and encrypt stages, and the HMAC key used by the signing stage. Both resolve to hashes of string constants held in the source tree, because the production configuration sets UseKeyVault, a setting no code reads, while the Enabled flag the code does read stays false.">
+  <rect width="960" height="490" fill="#ffffff"/>
+  <style>
+    .t   { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1f2328; }
+    .h   { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; font-weight: 600; }
+    .sub { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #59636e; }
+    .box { fill: #f6f8fa; stroke: #d1d9e0; stroke-width: 1.5; }
+    .bad { fill: #fff8f8; stroke: #cf222e; stroke-width: 1.5; }
+    .ok  { fill: #f2f8f4; stroke: #1a7f37; stroke-width: 1.5; }
+    .arr { stroke: #59636e; stroke-width: 1.5; fill: none; }
+    .arrbad { stroke: #cf222e; stroke-width: 1.5; fill: none; stroke-dasharray: 5 3; }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#59636e"/>
+    </marker>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#cf222e"/>
+    </marker>
+  </defs>
+
+  <text class="h" x="24" y="32" font-size="17">One credit transfer, end to end</text>
+  <text class="sub" x="24" y="53" font-size="13">CreditWalletService.TransferCreditsAsync. The balance is never legible to the database.</text>
+
+  <!-- pipeline: y 78 to 140 -->
+  <rect class="ok"  x="24"  y="78" width="150" height="62" rx="6"/>
+  <text class="h"   x="99"  y="102" font-size="12.5" text-anchor="middle">Serializable</text>
+  <text class="sub" x="99"  y="120" font-size="11" text-anchor="middle">BeginTransactionAsync</text>
+  <text class="sub" x="99"  y="134" font-size="11" text-anchor="middle">14 sites, 3 services</text>
+
+  <rect class="box" x="204" y="78" width="150" height="62" rx="6"/>
+  <text class="h"   x="279" y="102" font-size="12.5" text-anchor="middle">Decrypt x8</text>
+  <text class="sub" x="279" y="120" font-size="11" text-anchor="middle">two wallets,</text>
+  <text class="sub" x="279" y="134" font-size="11" text-anchor="middle">four fields each</text>
+
+  <rect class="box" x="384" y="78" width="150" height="62" rx="6"/>
+  <text class="h"   x="459" y="102" font-size="12.5" text-anchor="middle">Compare + move</text>
+  <text class="sub" x="459" y="120" font-size="11" text-anchor="middle">overdraft check runs</text>
+  <text class="sub" x="459" y="134" font-size="11" text-anchor="middle">in C#, not in SQL</text>
+
+  <rect class="box" x="564" y="78" width="160" height="62" rx="6"/>
+  <text class="h"   x="644" y="102" font-size="12.5" text-anchor="middle">Sign the row</text>
+  <text class="sub" x="644" y="120" font-size="11" text-anchor="middle">HMAC-SHA256; chains to</text>
+  <text class="sub" x="644" y="134" font-size="11" text-anchor="middle">the previous row here only</text>
+
+  <rect class="box" x="754" y="78" width="150" height="62" rx="6"/>
+  <text class="h"   x="829" y="102" font-size="12.5" text-anchor="middle">Encrypt x8</text>
+  <text class="sub" x="829" y="120" font-size="11" text-anchor="middle">AES-256-GCM,</text>
+  <text class="sub" x="829" y="134" font-size="11" text-anchor="middle">write back</text>
+
+  <path class="arr" d="M174,109 L200,109" marker-end="url(#a)"/>
+  <path class="arr" d="M354,109 L380,109" marker-end="url(#a)"/>
+  <path class="arr" d="M534,109 L560,109" marker-end="url(#a)"/>
+  <path class="arr" d="M724,109 L750,109" marker-end="url(#a)"/>
+
+  <text class="h" x="24" y="205" font-size="14">Where the two keys come from</text>
+
+  <!-- data key: box y 225 to 277. Feeds Decrypt (x 279) and Encrypt (x 829). -->
+  <rect class="bad" x="204" y="225" width="500" height="52" rx="6"/>
+  <text class="h" x="220" y="245" font-size="12.5">Data key, AzureKeyVaultService.GetDataEncryptionKeyAsync</text>
+  <text class="t" x="220" y="265" font-size="11.5">SHA256("SkillLedger-Test-DEK-Seed-For-Consistent-Encryption")</text>
+  <path class="arrbad" d="M279,225 L279,146" marker-end="url(#ar)"/>
+  <path class="arrbad" d="M704,251 L829,251 L829,146" marker-end="url(#ar)"/>
+
+  <!-- signing key: box y 293 to 345. Feeds Sign (x 644), routed clear of the box above. -->
+  <rect class="bad" x="204" y="293" width="500" height="52" rx="6"/>
+  <text class="h" x="220" y="313" font-size="12.5">Signing key, CreditWalletService.GetTransactionHashKeyAsync</text>
+  <text class="t" x="220" y="333" font-size="11.5">UTF8.GetBytes("SkillLedger-TransactionHash-Key-2024")</text>
+  <path class="arrbad" d="M704,319 L744,319 L744,168 L644,168 L644,146" marker-end="url(#ar)"/>
+
+  <!-- the config gate -->
+  <rect class="box" x="24" y="382" width="912" height="70" rx="6"/>
+  <text class="h" x="42" y="405" font-size="12.5">Why the data key took that branch in production:</text>
+  <text class="t" x="42" y="426" font-size="11.5">appsettings.json              "Enabled": false      &lt;- the flag the code reads</text>
+  <text class="t" x="42" y="443" font-size="11.5">appsettings.Production.json   "UseKeyVault": true   &lt;- a key no C# file anywhere reads</text>
+
+  <text class="sub" x="936" y="478" font-size="10.5" text-anchor="end">Every element above is checkable from this tree. See portfolio/CREDIT-LEDGER.md.</text>
+</svg>

@@ -1,0 +1,63 @@
+# SkillLedger Cursor Rules
+
+## Port Configuration - CRITICAL
+
+**ALWAYS use these ports for SkillLedger to avoid conflicts with other projects:**
+
+- Backend API HTTP: `8030`
+- Backend API HTTPS: `8031`
+- Frontend Client: `3030`
+- SQL Server (Docker): `9030`
+- SQL Server (Windows): `localhost\SQLEXPRESS01` (named instance)
+
+## Multi-Project Port Allocation Strategy
+
+When working across multiple projects, maintain this port allocation:
+
+1. **SkillLedger**: Backend 8030, Client 3030, SQL 9030
+
+### Port Pattern Rules
+- Backend API: `80X0` (X = project number 1-6)
+- Frontend Client: `30X0` (X = project number 1-6)
+- Mobile App: `50Y0` (Y varies)
+- SQL Server: `90X0` (X = project number 1-6)
+
+## Configuration Files to Check
+
+When changing ports, update these files:
+- `src/SkillLedger.Api/Properties/launchSettings.json` - Backend ports
+- `src/SkillLedger.Api/appsettings.json` - BaseUrl and CORS
+- `src/SkillLedger.Api/appsettings.Development.json` - BaseUrl, CORS, JWT audience
+- `web/package.json` - Frontend dev script port (-p 3030)
+- `web/next.config.js` - API proxy destination
+- `docker-compose.yml` - SQL Server port mapping
+- `start-windows-dev.ps1` - Documentation in startup script
+
+## Development Standards
+
+### Test-Driven Development (TDD)
+- Write tests FIRST for all critical paths
+- Follow Red-Green-Refactor cycle
+- Security, business logic, and financial calculations MUST have tests before implementation
+
+### Definition of Done
+- ✅ All tests passing (100%)
+- ✅ Zero linter errors
+- ✅ Build successful (frontend & backend)
+- ✅ Code committed with descriptive message
+
+### Git Workflow
+- Commit ALL related changes together (check `git status`)
+- Write descriptive commit messages
+- Include footer: `🤖 Generated with [Claude Code](https://claude.ai/code)`
+
+## Architecture
+- Clean Architecture with domain-driven design
+- Enterprise security (CSRF, rate limiting, audit logging)
+- Azure services integration (Key Vault, App Insights, Communication Services)
+- Financial compliance and tax reporting capabilities
+
+## Documentation
+See `CLAUDE.md` for complete project configuration and standards.
+
+

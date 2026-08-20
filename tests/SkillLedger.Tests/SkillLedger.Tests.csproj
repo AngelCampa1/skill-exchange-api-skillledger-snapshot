@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <!-- Performance optimization for test runner -->
+    <VSTestCollectorsOutputDir>$(OutputPath)</VSTestCollectorsOutputDir>
+    <MaxCpuCount>4</MaxCpuCount>
+    <TestAdaptersPaths>$(OutputPath)</TestAdaptersPaths>
+    <!-- Optimize test discovery and execution -->
+    <VSTestUseMSBuildOutput>false</VSTestUseMSBuildOutput>
+    <!-- Exclude resource-intensive tests by default -->
+    <VSTestCaseFilter>Category!=EndToEnd&amp;Category!=Performance</VSTestCaseFilter>
+    <VSTestCollectCodeCoverage>false</VSTestCollectCodeCoverage>
+    <VSTestBlameDataCollectors />
+    <!-- <RunSettingsFilePath>$(MSBuildProjectDirectory)/runsettings.xml</RunSettingsFilePath> -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Exclude nested projects from compilation -->
+  <ItemGroup>
+    <Compile Remove="Tools\**\*.cs" />
+    <None Remove="Tools\**\*" />
+    <Content Remove="Tools\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.1" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.10" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SkillLedger.Api\SkillLedger.Api.csproj" />
+    <ProjectReference Include="..\..\src\SkillLedger.Core\SkillLedger.Core.csproj" />
+    <ProjectReference Include="..\..\src\SkillLedger.Infrastructure\SkillLedger.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

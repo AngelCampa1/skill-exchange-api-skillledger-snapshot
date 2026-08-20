@@ -1,0 +1,134 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+web/playwright-report/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Next.js
+.next/
+out/
+.swc/
+*.tsbuildinfo
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# React Native
+android/app/build/
+ios/Pods/
+*.keystore
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Logs
+logs/
+*.log
+*.log.*
+test-output.log
+test-run.log
+coverage_run.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Test/coverage
+coverage/
+.nyc_output/
+*.lcov
+TestResults/
+
+# Build artifacts
+dist/
+build/
+tmp/
+temp/
+
+# Environment files
+.env
+.env.*
+!web/.env.production
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.bak
+
+# Misc
+.idea/
+*.iml
+nul
+.backup/
+.azure/
+=*
+
+# Temp files
+**/temp_*.sql
+
+# Documentation output
+*.pdf
+
+# Ignore secrets
+secrets.*
+
+# Debug artifacts and screenshots (but keep docs and public images)
+*.png
+!docs/**/*.png
+!web/public/**/*.png
+!**/assets/**/*.png
+
+# Test outputs and data
+test_output*.txt
+*_test_results.txt
+coverage-output.txt
+cookies.txt
+localcookies.txt
+create_project.json
+login.json
+
+# One-time debug scripts
+*.csx
+
+# Archived debug folder
+archived-debug/
+
+# Cache directories
+.claude-flow/
+.claude/worktrees/
+
+# End Generation Here
+web/test-results/nul
+
+# MCP config (may contain account IDs / tokens)
+.mcp.json
+
+# Wrangler / Cloudflare local state
+.wrangler/
+**/.wrangler/
+
+# Playwright accessibility-tree dumps and stray snapshot yaml
+.playwright-cli/
+dashboard-after-register.yaml
+registration-validation.yaml

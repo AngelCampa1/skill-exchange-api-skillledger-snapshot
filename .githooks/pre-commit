@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# pre-commit — SkillLedger quality gate
+# Runs automatically before every commit.
+# Only checks layers that have staged changes.
+# Backend and web run in parallel when both are touched.
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$STAGED" ]; then
+  echo "No staged files. Nothing to check."
+  exit 0
+fi
+
+has_changes_in() {
+  echo "$STAGED" | grep -q "^$1"
+}
+
+TMPDIR_HOOKS=$(mktemp -d)
+trap 'rm -rf "$TMPDIR_HOOKS"' EXIT
+
+# ── Backend (.NET) ───────────────────────────────────────────────────────────
+
+run_backend() {
+  local log="$TMPDIR_HOOKS/backend.log"
+  {
+    local failed=0
+
+    echo "▶ [pre-commit] Backend: build (type check)..."
+    (cd "$REPO_ROOT" && dotnet build --nologo -v minimal -warnaserror:false 2>&1) \
+      && echo "  ✓ Build passed" \
+      || { echo "  ✗ Build FAILED — commit blocked"; failed=1; }
+
+    echo "▶ [pre-commit] Backend: tests..."
+    (cd "$REPO_ROOT" && dotnet test --nologo \
+      --logger "console;verbosity=minimal" \
+      --filter "Category!=E2E" 2>&1) \
+      && echo "  ✓ Tests passed" \
+      || { echo "  ✗ Tests FAILED — commit blocked"; failed=1; }
+
+    return $failed
+  } > "$log" 2>&1
+}
+
+# ── Frontend (Next.js) ──────────────────────────────────────────────────────
+
+run_web() {
+  local log="$TMPDIR_HOOKS/web.log"
+  {
+    local failed=0
+    FRONTEND_DIR="$REPO_ROOT/web"
+
+    if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+      echo "▶ [pre-commit] Frontend: installing dependencies..."
+      (cd "$FRONTEND_DIR" && yarn install --frozen-lockfile 2>&1) \
+        && echo "  ✓ Dependencies installed" \
+        || { echo "  ✗ yarn install FAILED — commit blocked"; failed=1; }
+    fi
+
+    echo "▶ [pre-commit] Frontend: lint..."
+    (cd "$FRONTEND_DIR" && yarn lint 2>&1) \
+      && echo "  ✓ Lint passed" \
+      || { echo "  ✗ Lint FAILED — commit blocked"; failed=1; }
+
+    echo "▶ [pre-commit] Frontend: type check..."
+    (cd "$FRONTEND_DIR" && yarn typecheck 2>&1) \
+      && echo "  ✓ Type check passed" \
+      || { echo "  ✗ Type check FAILED — commit blocked"; failed=1; }
+
+    echo "▶ [pre-commit] Frontend: link validation..."
+    (cd "$FRONTEND_DIR" && yarn validate-links 2>&1) \
+      && echo "  ✓ Link validation passed" \
+      || { echo "  ✗ Link validation FAILED — commit blocked"; failed=1; }
+
+    echo "▶ [pre-commit] Frontend: tests..."
+    (cd "$FRONTEND_DIR" && timeout 300 yarn test --watchAll=false --forceExit --passWithNoTests 2>&1) \
+      && echo "  ✓ Tests passed" \
+      || { echo "  ✗ Tests FAILED or timed out — commit blocked"; failed=1; }
+
+    echo "▶ [pre-commit] Frontend: build..."
+    (cd "$FRONTEND_DIR" && yarn build 2>&1) \
+      && echo "  ✓ Build passed" \
+      || { echo "  ✗ Build FAILED — commit blocked"; failed=1; }
+
+    return $failed
+  } > "$log" 2>&1
+}
+
+# ── Run checks in parallel ───────────────────────────────────────────────────
+
+PIDS=()
+
+if has_changes_in "src/"; then
+  run_backend &
+  PIDS+=($!)
+fi
+
+if has_changes_in "web/"; then
+  run_web &
+  PIDS+=($!)
+fi
+
+if [ ${#PIDS[@]} -eq 0 ]; then
+  exit 0
+fi
+
+FAILED=0
+for pid in "${PIDS[@]}"; do
+  if ! wait "$pid"; then
+    FAILED=1
+  fi
+done
+
+# Print all logs in order
+for track in backend web; do
+  if [ -f "$TMPDIR_HOOKS/$track.log" ]; then
+    cat "$TMPDIR_HOOKS/$track.log"
+  fi
+done
+
+if [[ $FAILED -ne 0 ]]; then
+  echo ""
+  echo "pre-commit: commit blocked — fix the errors above first."
+  exit 1
+fi
+
+exit 0

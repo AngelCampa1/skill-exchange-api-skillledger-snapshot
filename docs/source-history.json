@@ -1,0 +1,28 @@
+{
+  "commits": 944,
+  "firstCommit": "2025-08-29",
+  "lastCommit": "2026-07-08",
+  "authors": [
+    { "name": "VentoraLabs", "email": "operator@ventoralabs.com", "commits": 751 },
+    { "name": "Angel Campa", "email": "operator@ventoralabs.com", "commits": 124 },
+    { "name": "Claude Code Assistant", "email": "claude-code@anthropic.com", "commits": 69 }
+  ],
+  "authorsNote": "The operator's own address appears here as operator@ventoralabs.com. The identities and their counts are unchanged and sum to 944.",
+  "commitsByMonth": {
+    "2025-08": 2,
+    "2025-09": 48,
+    "2025-10": 95,
+    "2025-11": 277,
+    "2025-12": 287,
+    "2026-01": 92,
+    "2026-02": 12,
+    "2026-03": 99,
+    "2026-04": 1,
+    "2026-05": 15,
+    "2026-06": 15,
+    "2026-07": 1
+  },
+  "lastCommitSubject": "chore: consolidate outstanding local work (wind-down backup)",
+  "sourceCommit": "761213492d73d350b17804afe5dcf072f9f49ae8",
+  "exportedAt": "2026-08-13"
+}

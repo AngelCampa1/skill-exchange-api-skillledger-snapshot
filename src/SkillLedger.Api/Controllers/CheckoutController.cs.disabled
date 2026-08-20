@@ -1,0 +1,280 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using SkillLedger.Core.Interfaces;
+using SkillLedger.Infrastructure.Services;
+using SkillLedger.Core.DTOs;
+
+namespace SkillLedger.Api.Controllers;
+
+/// <summary>
+/// Controller for handling Stripe checkout operations
+/// </summary>
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class CheckoutController : BaseApiController
+{
+    private readonly StripeCheckoutService _checkoutService;
+    private readonly ISubscriptionService _subscriptionService;
+    private readonly ILogger<CheckoutController> _logger;
+
+    public CheckoutController(
+        StripeCheckoutService checkoutService,
+        ISubscriptionService subscriptionService,
+        ILogger<CheckoutController> logger)
+    {
+        _checkoutService = checkoutService;
+        _subscriptionService = subscriptionService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Create a checkout session for a new subscription
+    /// </summary>
+    /// <param name="request">Checkout request details</param>
+    /// <returns>Checkout session details</returns>
+    [HttpPost("create-subscription")]
+    [ProducesResponseType(typeof(CheckoutSessionResult), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<CheckoutSessionResult>> CreateSubscriptionCheckout([FromBody] CreateSubscriptionCheckoutRequest request)
+    {
+        try
+        {
+            // Get current user ID
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            // Validate request
+            if (request.TierId == Guid.Empty)
+            {
+                return BadRequest("Tier ID is required");
+            }
+
+            if (string.IsNullOrEmpty(request.SuccessUrl))
+            {
+                return BadRequest("Success URL is required");
+            }
+
+            if (string.IsNullOrEmpty(request.CancelUrl))
+            {
+                return BadRequest("Cancel URL is required");
+            }
+
+            // Validate that user doesn't already have an active subscription with this tier
+            var existingSubscription = await _subscriptionService.GetUserActiveSubscriptionAsync(userId);
+            if (existingSubscription != null && existingSubscription.SubscriptionTierId == request.TierId)
+            {
+                return BadRequest("You already have an active subscription to this tier");
+            }
+
+            // Generate URLs based on request or use defaults
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var successUrl = !string.IsNullOrEmpty(request.SuccessUrl) && request.SuccessUrl.StartsWith("http")
+                ? request.SuccessUrl
+                : $"{baseUrl}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}";
+
+            var cancelUrl = !string.IsNullOrEmpty(request.CancelUrl) && request.CancelUrl.StartsWith("http")
+                ? request.CancelUrl
+                : $"{baseUrl}/subscription/cancel";
+
+            // Create checkout session
+            var result = await _checkoutService.CreateSubscriptionCheckoutAsync(
+                userId,
+                request.TierId,
+                request.BillingCycle,
+                successUrl,
+                cancelUrl,
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            if (!result.Success)
+            {
+                return BadRequest(result.ErrorMessage);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating subscription checkout session for user");
+            return StatusCode(500, "An error occurred while creating the checkout session");
+        }
+    }
+
+    /// <summary>
+    /// Create a checkout session for adding a payment method
+    /// </summary>
+    /// <param name="request">Payment method setup request</param>
+    /// <returns>Checkout session details</returns>
+    [HttpPost("setup-payment-method")]
+    [ProducesResponseType(typeof(CheckoutSessionResult), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<CheckoutSessionResult>> CreatePaymentMethodSetupSession([FromBody] PaymentMethodSetupRequest request)
+    {
+        try
+        {
+            // Get current user ID
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            // Validate request
+            if (string.IsNullOrEmpty(request.SuccessUrl))
+            {
+                return BadRequest("Success URL is required");
+            }
+
+            if (string.IsNullOrEmpty(request.CancelUrl))
+            {
+                return BadRequest("Cancel URL is required");
+            }
+
+            // Generate URLs
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var successUrl = !string.IsNullOrEmpty(request.SuccessUrl) && request.SuccessUrl.StartsWith("http")
+                ? request.SuccessUrl
+                : $"{baseUrl}/account/payment-methods?setup_success=true";
+
+            var cancelUrl = !string.IsNullOrEmpty(request.CancelUrl) && request.CancelUrl.StartsWith("http")
+                ? request.CancelUrl
+                : $"{baseUrl}/account/payment-methods";
+
+            // Create checkout session
+            var result = await _checkoutService.CreatePaymentMethodSetupSessionAsync(
+                userId,
+                successUrl,
+                cancelUrl,
+                HttpContext.Connection.RemoteIpAddress?.ToString());
+
+            if (!result.Success)
+            {
+                return BadRequest(result.ErrorMessage);
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating payment method setup session for user");
+            return StatusCode(500, "An error occurred while creating the payment method setup session");
+        }
+    }
+
+    /// <summary>
+    /// Get details of a checkout session
+    /// </summary>
+    /// <param name="sessionId">Stripe session ID</param>
+    /// <returns>Session details</returns>
+    [HttpGet("session/{sessionId}")]
+    [ProducesResponseType(typeof(CheckoutSessionDetails), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<CheckoutSessionDetails>> GetCheckoutSession(string sessionId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                return BadRequest("Session ID is required");
+            }
+
+            var sessionDetails = await _checkoutService.GetCheckoutSessionAsync(sessionId);
+            if (sessionDetails == null)
+            {
+                return NotFound("Session not found");
+            }
+
+            return Ok(sessionDetails);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving checkout session {SessionId}", sessionId);
+            return StatusCode(500, "An error occurred while retrieving the session");
+        }
+    }
+
+    /// <summary>
+    /// Get available subscription tiers for checkout
+    /// </summary>
+    /// <returns>List of available subscription tiers</returns>
+    [HttpGet("subscription-tiers")]
+    [ProducesResponseType(typeof(List<SubscriptionTierDto>), 200)]
+    public async Task<ActionResult<List<SubscriptionTierDto>>> GetSubscriptionTiers()
+    {
+        try
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            var tiers = await _subscriptionService.GetAvailableTiersAsync();
+            return Ok(tiers);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving subscription tiers");
+            return StatusCode(500, "An error occurred while retrieving subscription tiers");
+        }
+    }
+}
+
+/// <summary>
+/// Request to create a subscription checkout session
+/// </summary>
+public class CreateSubscriptionCheckoutRequest
+{
+    /// <summary>
+    /// Subscription tier ID
+    /// </summary>
+    public Guid TierId { get; set; }
+
+    /// <summary>
+    /// Billing cycle (Monthly or Annual)
+    /// </summary>
+    public BillingCycle BillingCycle { get; set; } = BillingCycle.Monthly;
+
+    /// <summary>
+    /// URL to redirect to on successful payment
+    /// </summary>
+    public string SuccessUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// URL to redirect to on cancelled payment
+    /// </summary>
+    public string CancelUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional promo code
+    /// </summary>
+    public string? PromoCode { get; set; }
+}
+
+/// <summary>
+/// Request to create a payment method setup session
+/// </summary>
+public class PaymentMethodSetupRequest
+{
+    /// <summary>
+    /// URL to redirect to on successful setup
+    /// </summary>
+    public string SuccessUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// URL to redirect to on cancelled setup
+    /// </summary>
+    public string CancelUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether this should be set as the default payment method
+    /// </summary>
+    public bool SetAsDefault { get; set; } = true;
+}

@@ -1,0 +1,570 @@
+using System.Text;
+using Microsoft.Extensions.Logging;
+using Moq;
+using SkillLedger.Core.DTOs;
+using SkillLedger.Core.Entities;
+using SkillLedger.Core.Enums;
+using SkillLedger.Infrastructure.Services;
+using Xunit;
+
+namespace SkillLedger.Tests.Unit;
+
+public class FinancialExportServiceTests
+{
+    private readonly Mock<ILogger<FinancialExportService>> _mockLogger;
+    private readonly FinancialExportService _service;
+    private readonly Guid _testUserId = Guid.NewGuid();
+
+    public FinancialExportServiceTests()
+    {
+        _mockLogger = new Mock<ILogger<FinancialExportService>>();
+        _service = new FinancialExportService(_mockLogger.Object);
+    }
+
+    #region CSV Export Tests
+
+    [Fact]
+    public async Task ExportToCsvAsync_WithCreditSummaryReport_ReturnsValidCsvData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.CSV);
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToCsvAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var csvContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("Credit Summary Report", csvContent);
+        Assert.Contains("Total Credits Earned,1000", csvContent);
+        Assert.Contains("Total Credits Spent,500", csvContent);
+        Assert.Contains("Net Credit Change,500", csvContent);
+    }
+
+    [Fact]
+    public async Task ExportToCsvAsync_WithTransactionsList_ReturnsValidCsvData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.CSV);
+        var transactions = CreateTestTransactions();
+
+        // Act
+        var result = await _service.ExportToCsvAsync(request, transactions);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var csvContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("Transaction History", csvContent);
+        Assert.Contains("Date,Type,Amount,Description,Reference ID,Status", csvContent);
+        Assert.Contains("ProjectPayment", csvContent);
+        Assert.Contains("EscrowDeposit", csvContent);
+    }
+
+    [Fact]
+    public async Task ExportToCsvAsync_WithAnalyticsData_ReturnsValidCsvData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.CSV);
+        var analytics = CreateTestAnalyticsData();
+
+        // Act
+        var result = await _service.ExportToCsvAsync(request, analytics);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var csvContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("Analytics Data", csvContent);
+        Assert.Contains("Trend Data", csvContent);
+        Assert.Contains("Date,Credits Earned,Credits Spent,Net Change", csvContent);
+    }
+
+    [Fact]
+    public async Task ExportToCsvAsync_WithDashboardData_ReturnsValidCsvData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.CSV);
+        var dashboard = CreateTestDashboardData();
+
+        // Act
+        var result = await _service.ExportToCsvAsync(request, dashboard);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var csvContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("Dashboard Data", csvContent);
+        Assert.Contains("Current Balance,2500", csvContent);
+        Assert.Contains("Credits This Month,300", csvContent);
+    }
+
+    [Fact]
+    public async Task ExportToCsvAsync_WithUnsupportedDataType_ThrowsArgumentException()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.CSV);
+        var unsupportedData = "unsupported string data";
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _service.ExportToCsvAsync(request, unsupportedData));
+    }
+
+    #endregion
+
+    #region PDF Export Tests
+
+    [Fact]
+    public async Task ExportToPdfAsync_WithCreditSummaryReport_ReturnsValidHtmlContent()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.PDF);
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToPdfAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var htmlContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("<!DOCTYPE html>", htmlContent);
+        Assert.Contains("<h1>Credit Summary Report</h1>", htmlContent);
+        Assert.Contains("Total Credits Earned", htmlContent);
+        Assert.Contains("1000", htmlContent); // Credits earned value
+    }
+
+    [Fact]
+    public async Task ExportToPdfAsync_WithTransactionsList_ReturnsValidHtmlContent()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.PDF);
+        var transactions = CreateTestTransactions();
+
+        // Act
+        var result = await _service.ExportToPdfAsync(request, transactions);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var htmlContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("Transaction History", htmlContent);
+        Assert.Contains("<table>", htmlContent);
+        Assert.Contains("ProjectPayment", htmlContent);
+    }
+
+    [Fact]
+    public async Task ExportToPdfAsync_WithUnsupportedDataType_ThrowsArgumentException()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.PDF);
+        var unsupportedData = 12345;
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _service.ExportToPdfAsync(request, unsupportedData));
+    }
+
+    #endregion
+
+    #region JSON Export Tests
+
+    [Fact]
+    public async Task ExportToJsonAsync_WithCreditSummaryReport_ReturnsValidJsonData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.JSON);
+        request.IncludeMetadata = true;
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToJsonAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var jsonContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("exportInfo", jsonContent);
+        Assert.Contains("data", jsonContent);
+        Assert.Contains($"\"{_testUserId}\"", jsonContent);
+        Assert.Contains("totalCreditsEarned", jsonContent);
+    }
+
+    [Fact]
+    public async Task ExportToJsonAsync_WithMetadataDisabled_ExcludesMetadata()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.JSON);
+        request.IncludeMetadata = false;
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToJsonAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        var jsonContent = Encoding.UTF8.GetString(result);
+        // Should still contain exportInfo but not be indented
+        Assert.Contains("exportInfo", jsonContent);
+        Assert.Contains("data", jsonContent);
+    }
+
+    #endregion
+
+    #region XML Export Tests
+
+    [Fact]
+    public async Task ExportToXmlAsync_WithCreditSummaryReport_ReturnsValidXmlData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.XML);
+        request.IncludeMetadata = true;
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToXmlAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+
+        var xmlContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("<?xml version=\"1.0\" encoding=\"UTF-8\"?>", xmlContent);
+        Assert.Contains("<FinancialExport>", xmlContent);
+        Assert.Contains("<ExportInfo>", xmlContent);
+        Assert.Contains("<CreditSummaryReport>", xmlContent);
+        Assert.Contains("<TotalCreditsEarned>1000</TotalCreditsEarned>", xmlContent);
+        Assert.Contains("</FinancialExport>", xmlContent);
+    }
+
+    [Fact]
+    public async Task ExportToXmlAsync_WithMetadataDisabled_ExcludesExportInfo()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.XML);
+        request.IncludeMetadata = false;
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToXmlAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        var xmlContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("<FinancialExport>", xmlContent);
+        Assert.DoesNotContain("<ExportInfo>", xmlContent);
+        Assert.Contains("<CreditSummaryReport>", xmlContent);
+    }
+
+    [Fact]
+    public async Task ExportToXmlAsync_WithTransactionsList_ReturnsValidXmlData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.XML);
+        var transactions = CreateTestTransactions();
+
+        // Act
+        var result = await _service.ExportToXmlAsync(request, transactions);
+
+        // Assert
+        Assert.NotNull(result);
+        var xmlContent = Encoding.UTF8.GetString(result);
+        Assert.Contains("<Transactions>", xmlContent);
+        Assert.Contains("<Transaction>", xmlContent);
+        Assert.Contains("<TransactionType>ProjectPayment</TransactionType>", xmlContent);
+        Assert.Contains("</Transactions>", xmlContent);
+    }
+
+    #endregion
+
+    #region Excel Export Tests
+
+    [Fact]
+    public async Task ExportToExcelAsync_WithCreditSummaryReport_ReturnsData()
+    {
+        // Arrange
+        var request = CreateTestExportRequest(ExportFormat.Excel);
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ExportToExcelAsync(request, report);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+        // Note: Current implementation returns CSV format as placeholder
+        var content = Encoding.UTF8.GetString(result);
+        Assert.Contains("Credit Summary Report", content);
+    }
+
+    #endregion
+
+    #region Template Tests
+
+    [Fact]
+    public async Task CreateTemplateAsync_WithValidData_ReturnsTemplate()
+    {
+        // Arrange
+        var templateName = "Monthly Report Template";
+        var format = ExportFormat.CSV;
+        var templateData = new Dictionary<string, object>
+        {
+            { "includeHeaders", true },
+            { "dateFormat", "yyyy-MM-dd" },
+            { "currency", "USD" }
+        };
+
+        // Act
+        var result = await _service.CreateTemplateAsync(templateName, format, templateData);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(templateName, result.Name);
+        Assert.Equal(format, result.Format);
+        Assert.True(result.IsActive);
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.NotNull(result.TemplateData);
+    }
+
+    [Fact]
+    public async Task ApplyTemplateAsync_WithValidTemplate_ReturnsExportData()
+    {
+        // Arrange
+        var template = new ExportTemplate
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test Template",
+            Format = ExportFormat.CSV,
+            TemplateData = "{\"includeHeaders\": true}",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        var request = CreateTestExportRequest(ExportFormat.JSON); // Will be overridden by template
+        var report = CreateTestCreditSummaryReport();
+
+        // Act
+        var result = await _service.ApplyTemplateAsync(template, report, request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Length > 0);
+        // Should be CSV format due to template override
+        var content = Encoding.UTF8.GetString(result);
+        Assert.Contains("Credit Summary Report", content);
+    }
+
+    [Fact]
+    public async Task ApplyTemplateAsync_WithUnsupportedFormat_ThrowsArgumentException()
+    {
+        // Arrange
+        var template = new ExportTemplate
+        {
+            Format = (ExportFormat)999, // Invalid format
+            TemplateData = "{}"
+        };
+        var request = CreateTestExportRequest(ExportFormat.CSV);
+        var data = CreateTestCreditSummaryReport();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => 
+            _service.ApplyTemplateAsync(template, data, request));
+    }
+
+    #endregion
+
+    #region Bulk Export Tests
+
+    [Fact]
+    public async Task BulkExportAsync_WithMultipleValidRequests_ReturnsAllResults()
+    {
+        // Arrange
+        var exportRequests = new List<(string filename, object data, FinancialExportRequest request)>
+        {
+            ("summary.csv", CreateTestCreditSummaryReport(), CreateTestExportRequest(ExportFormat.CSV)),
+            ("transactions.json", CreateTestTransactions(), CreateTestExportRequest(ExportFormat.JSON)),
+            ("analytics.xml", CreateTestAnalyticsData(), CreateTestExportRequest(ExportFormat.XML))
+        };
+
+        // Act
+        var results = await _service.BulkExportAsync(exportRequests);
+
+        // Assert
+        Assert.NotNull(results);
+        Assert.Equal(3, results.Count);
+        Assert.True(results.ContainsKey("summary.csv"));
+        Assert.True(results.ContainsKey("transactions.json"));
+        Assert.True(results.ContainsKey("analytics.xml"));
+
+        foreach (var result in results.Values)
+        {
+            Assert.True(result.Length > 0);
+        }
+    }
+
+    [Fact]
+    public async Task BulkExportAsync_WithSomeFailures_ReturnsSuccessfulExports()
+    {
+        // Arrange
+        var exportRequests = new List<(string filename, object data, FinancialExportRequest request)>
+        {
+            ("valid.csv", CreateTestCreditSummaryReport(), CreateTestExportRequest(ExportFormat.CSV)),
+            ("invalid.csv", "invalid data", CreateTestExportRequest(ExportFormat.CSV)), // This will fail
+            ("valid2.json", CreateTestTransactions(), CreateTestExportRequest(ExportFormat.JSON))
+        };
+
+        // Act
+        var results = await _service.BulkExportAsync(exportRequests);
+
+        // Assert
+        Assert.NotNull(results);
+        Assert.Equal(2, results.Count); // Only successful exports
+        Assert.True(results.ContainsKey("valid.csv"));
+        Assert.True(results.ContainsKey("valid2.json"));
+        Assert.False(results.ContainsKey("invalid.csv"));
+    }
+
+    [Fact]
+    public async Task BulkExportAsync_WithEmptyList_ReturnsEmptyResults()
+    {
+        // Arrange
+        var exportRequests = new List<(string filename, object data, FinancialExportRequest request)>();
+
+        // Act
+        var results = await _service.BulkExportAsync(exportRequests);
+
+        // Assert
+        Assert.NotNull(results);
+        Assert.Empty(results);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private FinancialExportRequest CreateTestExportRequest(ExportFormat format)
+    {
+        return new FinancialExportRequest
+        {
+            UserId = _testUserId,
+            Format = format,
+            StartDate = new DateTime(2024, 1, 1),
+            EndDate = new DateTime(2024, 1, 31),
+            IncludeMetadata = true
+        };
+    }
+
+    private CreditSummaryReport CreateTestCreditSummaryReport()
+    {
+        return new CreditSummaryReport
+        {
+            UserId = _testUserId,
+            StartDate = new DateTime(2024, 1, 1),
+            EndDate = new DateTime(2024, 1, 31),
+            GeneratedAt = DateTime.UtcNow,
+            TotalCreditsEarned = 1000,
+            TotalCreditsSpent = 500,
+            NetCreditChange = 500,
+            StartingBalance = 2000,
+            EndingBalance = 2500,
+            TransactionCount = 15,
+            AverageTransactionSize = 66.67m,
+            CategoryBreakdown = new List<TransactionCategoryBreakdown>
+            {
+                new() 
+                { 
+                    TransactionType = CreditTransactionType.ProjectPayment, 
+                    TotalAmount = 800, 
+                    TransactionCount = 8 
+                },
+                new() 
+                { 
+                    TransactionType = CreditTransactionType.EscrowDeposit, 
+                    TotalAmount = 200, 
+                    TransactionCount = 2 
+                }
+            }
+        };
+    }
+
+    private List<CreditTransaction> CreateTestTransactions()
+    {
+        return new List<CreditTransaction>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                Amount = 500,
+                TransactionType = CreditTransactionType.ProjectPayment,
+                Description = "Project completion payment",
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                Status = CreditTransactionStatus.Completed,
+                ReferenceId = "REF001"
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                Amount = -200,
+                TransactionType = CreditTransactionType.EscrowDeposit,
+                Description = "Escrow for new project",
+                CreatedAt = DateTime.UtcNow.AddDays(-2),
+                Status = CreditTransactionStatus.Completed,
+                ReferenceId = "REF002"
+            }
+        };
+    }
+
+    private AnalyticsData CreateTestAnalyticsData()
+    {
+        return new AnalyticsData
+        {
+            UserId = _testUserId,
+            StartDate = new DateTime(2024, 1, 1),
+            EndDate = new DateTime(2024, 1, 31),
+            GeneratedAt = DateTime.UtcNow,
+            TrendData = new List<TrendDataPoint>
+            {
+                new()
+                {
+                    Date = new DateTime(2024, 1, 15),
+                    CreditsEarned = 500,
+                    CreditsSpent = 200,
+                    NetChange = 300
+                },
+                new()
+                {
+                    Date = new DateTime(2024, 1, 30),
+                    CreditsEarned = 300,
+                    CreditsSpent = 150,
+                    NetChange = 150
+                }
+            }
+        };
+    }
+
+    private UserDashboardData CreateTestDashboardData()
+    {
+        return new UserDashboardData
+        {
+            UserId = _testUserId,
+            GeneratedAt = DateTime.UtcNow,
+            CurrentBalance = 2500,
+            CreditsThisMonth = 300,
+            CreditsThisYear = 5000,
+            ActiveGoals = 2
+        };
+    }
+
+    #endregion
+}

@@ -1,0 +1,96 @@
+# SkillLedger
+
+> Last updated: 2026-03-18
+> Professional skill exchange and barter platform. Professionals trade services using a credit-based system.
+
+## What is SkillLedger?
+
+SkillLedger is a platform for professionals to exchange skills and services without cash. Users earn credits by providing services to others, then spend credits to access services they need.
+
+## Core Concepts
+
+- **Skill Exchange**: Trading professional services between two or more professionals
+- **Credits**: SkillLedger's internal currency. Earned by completing projects; spent on services
+- **Reputation Score**: Trust metric based on completed exchanges, reviews, and platform history
+- **Escrow**: Credits held until both parties confirm satisfactory project completion
+
+## Skill Categories
+
+Web Development, Design, Marketing, Writing & Content, Business Consulting, Video Production, Photography, Music & Audio, Data Science, AI & Machine Learning, Mobile Development, Legal Services, Finance & Accounting, Engineering, Business Development, Healthcare & Wellness, Real Estate, Non-Profit, Content Creators
+
+## How Exchanges Work
+
+1. Post your skills and credit rate
+2. Browse professionals offering what you need
+3. Propose a project with credit terms
+4. Complete work; credits transfer automatically
+5. Leave reviews to build reputation
+
+## Markdown Pages (plain-text for AI crawlers)
+
+- Homepage: https://skillledger.app/md/homepage.md
+- Pricing: https://skillledger.app/md/pricing.md
+- About: https://skillledger.app/md/about.md
+- How It Works: https://skillledger.app/features
+- Categories: https://skillledger.app/md/categories.md
+- Features: https://skillledger.app/md/features.md
+
+- [Glossary](https://skillledger.app/md/glossary.md): All 49 defined terms
+- [Comparisons](https://skillledger.app/md/comparisons.md): 15 platform comparison verdicts
+- [Industries](https://skillledger.app/md/industries.md): 12 industry profiles with regulatory notes
+- [How-To Guides](https://skillledger.app/md/how-to-guides.md): 21 step-by-step exchange scenarios
+- [Complete FAQ](https://skillledger.app/md/faq-complete.md): Comprehensive FAQ
+
+## Content Taxonomy
+- Categories (19) → each has: FAQs, sample skills, credit rates, related articles, related industries
+- Industries (12) → each has: skill pairings, regulatory notes, FAQs, related articles
+- How-To Guides (21) → each has: step-by-step instructions, benefits, FAQs
+- Trade Pairings (342) → each has: credit comparison, 5-step process, 3 FAQs
+- City+Skill Pages (988) → each has: local demand context, how-it-works, FAQs
+- Articles (52) → organized in 8 silos with buyer-stage tagging
+- Glossary (49 terms) → each with definition and related terms
+- Comparisons (15) → each with side-by-side analysis and verdict
+
+## Unique Value Propositions
+1. Zero transaction fees — professionals keep 100% of their earned credit value
+2. Fair market value credits — rates reflect real market prices, not flat hour-for-hour
+3. Built-in escrow on every exchange — credits release only when both parties confirm satisfaction
+4. Automated IRS 1099-B reporting — barter tax compliance handled automatically
+5. Reputation-weighted matching — badge system surfaces reliable exchange partners
+
+## Links
+
+- Homepage: https://skillledger.app
+- About: https://skillledger.app/about
+- Pricing: https://skillledger.app/pricing
+- Categories: https://skillledger.app/categories
+- Industries: https://skillledger.app/industries
+- How-To Guides: https://skillledger.app/how-to
+- Compare: https://skillledger.app/compare
+- Glossary: https://skillledger.app/glossary
+- Resources: https://skillledger.app/resources
+- Templates: https://skillledger.app/resources/templates
+- Barter Valuation Calculator: https://skillledger.app/tools/barter-valuation-calculator
+- FAQ: https://skillledger.app/faq
+- Skill Exchange by City: https://skillledger.app/skill-exchange
+- Skill Exchange by Location: https://skillledger.app/locations
+- Trade Skills (all pairings): https://skillledger.app/trade
+- Register: https://skillledger.app/register
+- Full sitemap: https://skillledger.app/sitemap.xml
+- Full LLM context: https://skillledger.app/llms-full.txt
+
+## Trade Routes (/trade)
+
+342 skill-pairing pages across 19 categories. Each page covers credit rate comparison, exchange process, FAQs, and related pairings.
+- Format: /trade/[skillA]/for/[skillB]
+- Example: https://skillledger.app/trade/web-development/for/design
+- Example: https://skillledger.app/trade/legal/for/marketing
+- Example: https://skillledger.app/trade/ai-ml/for/writing
+
+## Location + Skill Routes (/locations)
+
+950 city-specific skill pages across 50 US cities and 19 categories. Each page covers local demand, how-it-works, FAQs, and related categories.
+- Format: /locations/[city]/[skill]
+- Example: https://skillledger.app/locations/new-york/web-development
+- Example: https://skillledger.app/locations/austin/design
+- Example: https://skillledger.app/locations/los-angeles/content-creators

@@ -1,0 +1,670 @@
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using SkillLedger.Core.DTOs;
+using SkillLedger.Core.Entities;
+using SkillLedger.Core.Enums;
+using SkillLedger.Infrastructure.Configuration;
+using SkillLedger.Infrastructure.Data;
+using SkillLedger.Infrastructure.Services;
+using SkillLedger.Tests.Infrastructure;
+using SkillLedger.Tests.Mocks;
+using Xunit;
+
+namespace SkillLedger.Tests.Integration.Services;
+
+/// <summary>
+/// Integration tests for FinancialReportingService - BUSINESS LOGIC (financial reporting and analytics).
+///
+/// CORRECT PATTERN (per TDD_GUIDE.md):
+/// - Uses real database (in-memory EF Core)
+/// - Uses REAL CreditWalletService (internal service - financial calculations)
+/// - Uses MockAuditLogService that writes to real database (internal service)
+/// - Uses MockFinancialExportService (external file generation - OK to mock)
+/// - Verifies actual database state, not mock interactions
+///
+/// Max mocked external dependencies: 1 (File Export Service)
+/// </summary>
+[IntegrationTest]
+[FinancialTest]
+public class FinancialReportingServiceIntegrationTests : IDisposable
+{
+    private readonly SkillLedgerDbContext _context;
+    private readonly CreditWalletService _creditWalletService;  // REAL (internal financial service)
+    private readonly MockAuditLogService _auditLogService;  // REAL (writes to DB)
+    private readonly MockFinancialExportService _exportService;  // EXTERNAL - OK to mock
+    private readonly FinancialReportingService _reportingService;
+
+    private readonly Guid _testUserId = Guid.NewGuid();
+    private readonly DateTime _testStartDate = new DateTime(2024, 1, 1);
+    private readonly DateTime _testEndDate = new DateTime(2024, 12, 31);
+
+    public FinancialReportingServiceIntegrationTests()
+    {
+        var options = new DbContextOptionsBuilder<SkillLedgerDbContext>()
+            .UseInMemoryDatabase(databaseName: $"FinancialReportingTests_{Guid.NewGuid()}")
+            .Options;
+
+        _context = new SkillLedgerDbContext(options);
+        _context.Database.EnsureCreated();
+
+        // Setup REAL internal services
+        _auditLogService = new MockAuditLogService(_context);  // Writes to real DB!
+        var walletLogger = new LoggerFactory().CreateLogger<CreditWalletService>();
+        _creditWalletService = new CreditWalletService(_context, _auditLogService, walletLogger);  // REAL!
+
+        // Setup EXTERNAL service (OK to mock)
+        _exportService = new MockFinancialExportService();
+
+        var reportLogger = new LoggerFactory().CreateLogger<FinancialReportingService>();
+        var encryptionConfig = Options.Create(new EncryptionConfiguration
+        {
+            MasterKey = "test-master-key-for-encryption-testing-12345",
+            KeyRotationDays = 90
+        });
+
+        _reportingService = new FinancialReportingService(
+            _context,
+            _creditWalletService,
+            _exportService,
+            _auditLogService,
+            reportLogger,
+            encryptionConfig);
+
+        SetupTestData();
+    }
+
+    private void SetupTestData()
+    {
+        // Create test user
+        var user = new User
+        {
+            Id = _testUserId,
+            Email = "testuser@example.com",
+            UserName = "testuser@example.com",
+            Status = UserStatus.Active,
+            CreatedAt = _testStartDate.AddDays(-365)
+        };
+
+        _context.Users.Add(user);
+        _context.SaveChanges();
+
+        // Create wallet and transactions for testing
+        CreateTestTransactions();
+    }
+
+    private void CreateTestTransactions()
+    {
+        // Create test credit wallet
+        var wallet = new CreditWallet
+        {
+            Id = Guid.NewGuid(),
+            UserId = _testUserId,
+            TotalEarned = 5000,
+            TotalSpent = 2000,
+            CurrentBalance = 3000,
+            CreatedAt = _testStartDate.AddDays(-365),
+            UpdatedAt = DateTime.UtcNow
+        };
+        _context.CreditWallets.Add(wallet);
+
+        // Create various transaction types for comprehensive testing
+        var transactions = new List<CreditTransaction>
+        {
+            // Earning transactions
+            new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                WalletId = wallet.Id,
+                Amount = 1000,
+                TransactionType = CreditTransactionType.ProjectEarnings,
+                Description = "Project payment",
+                CreatedAt = _testStartDate.AddMonths(1),
+                Status = TransactionStatus.Completed
+            },
+            new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                WalletId = wallet.Id,
+                Amount = 1500,
+                TransactionType = CreditTransactionType.ProjectEarnings,
+                Description = "Bonus payment",
+                CreatedAt = _testStartDate.AddMonths(3),
+                Status = TransactionStatus.Completed
+            },
+            new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                WalletId = wallet.Id,
+                Amount = 2500,
+                TransactionType = CreditTransactionType.ProjectEarnings,
+                Description = "Large project completion",
+                CreatedAt = _testStartDate.AddMonths(6),
+                Status = TransactionStatus.Completed
+            },
+            // Spending transactions
+            new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                WalletId = wallet.Id,
+                Amount = -500,
+                TransactionType = CreditTransactionType.Purchase,
+                Description = "Service purchase",
+                CreatedAt = _testStartDate.AddMonths(2),
+                Status = TransactionStatus.Completed
+            },
+            new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                WalletId = wallet.Id,
+                Amount = -1500,
+                TransactionType = CreditTransactionType.Purchase,
+                Description = "Equipment purchase",
+                CreatedAt = _testStartDate.AddMonths(4),
+                Status = TransactionStatus.Completed
+            }
+        };
+
+        _context.CreditTransactions.AddRange(transactions);
+        _context.SaveChanges();
+    }
+
+    [Fact]
+    public async Task GenerateCreditSummaryReportAsync_ValidRequest_ShouldReturnCompleteReport()
+    {
+        // Arrange
+        var request = new CreditReportRequest
+        {
+            UserId = _testUserId,
+            StartDate = _testStartDate,
+            EndDate = _testEndDate,
+            PeriodType = ReportPeriodType.Annual,
+            IncludeProjectBreakdown = true
+        };
+
+        // Act
+        var report = await _reportingService.GenerateCreditSummaryReportAsync(request);
+
+        // Assert - Verify report structure
+        report.Should().NotBeNull();
+        report.UserId.Should().Be(_testUserId);
+        report.Summary.Should().NotBeNull();
+        report.GeneratedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+
+        // Assert - Verify financial calculations (from REAL CreditWalletService)
+        report.Summary.TotalEarned.Should().Be(5000);
+        report.Summary.TotalSpent.Should().Be(2000);
+        report.Summary.NetBalance.Should().Be(3000);
+
+        // Assert - Verify audit log in database
+        var auditLog = await _context.AuditLogs
+            .FirstOrDefaultAsync(a => a.UserId == _testUserId && a.Action == "GenerateCreditSummaryReport");
+        auditLog.Should().NotBeNull();
+        auditLog!.Success.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GenerateMonthlyReportAsync_ValidData_ShouldCreateReportInDatabase()
+    {
+        // Arrange
+        var reportMonth = _testStartDate.AddMonths(3);
+
+        // Act
+        var report = await _reportingService.GenerateMonthlyReportAsync(_testUserId, reportMonth.Year, reportMonth.Month);
+
+        // Assert - Verify report returned
+        report.Should().NotBeNull();
+        report.UserId.Should().Be(_testUserId);
+        report.Year.Should().Be(reportMonth.Year);
+        report.Month.Should().Be(reportMonth.Month);
+
+        // Assert - Verify report saved to database
+        var savedReport = await _context.MonthlyFinancialReports
+            .FirstOrDefaultAsync(r => r.UserId == _testUserId && r.Year == reportMonth.Year && r.Month == reportMonth.Month);
+        savedReport.Should().NotBeNull();
+        savedReport!.TotalEarned.Should().BeGreaterThanOrEqualTo(0);
+        savedReport.TotalSpent.Should().BeGreaterThanOrEqualTo(0);
+    }
+
+    [Fact]
+    public async Task GenerateMonthlyReportAsync_WithExistingReport_ShouldReturnExisting()
+    {
+        // Arrange
+        var reportMonth = _testStartDate.AddMonths(2);
+        var existingReport = new MonthlyFinancialReport
+        {
+            Id = Guid.NewGuid(),
+            UserId = _testUserId,
+            Year = reportMonth.Year,
+            Month = reportMonth.Month,
+            TotalEarned = 1000,
+            TotalSpent = 500,
+            NetBalance = 500,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.MonthlyFinancialReports.Add(existingReport);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var report = await _reportingService.GenerateMonthlyReportAsync(_testUserId, reportMonth.Year, reportMonth.Month, forceRecalculate: false);
+
+        // Assert - Should return existing report
+        report.Should().NotBeNull();
+        report.Id.Should().Be(existingReport.Id);
+        report.TotalEarned.Should().Be(1000);
+    }
+
+    [Fact]
+    public async Task GenerateMonthlyReportAsync_WithForceRecalculate_ShouldUpdateReport()
+    {
+        // Arrange
+        var reportMonth = _testStartDate.AddMonths(1);
+        var existingReport = new MonthlyFinancialReport
+        {
+            Id = Guid.NewGuid(),
+            UserId = _testUserId,
+            Year = reportMonth.Year,
+            Month = reportMonth.Month,
+            TotalEarned = 0,  // Old data
+            TotalSpent = 0,   // Old data
+            NetBalance = 0,   // Old data
+            CreatedAt = DateTime.UtcNow.AddDays(-30)
+        };
+        _context.MonthlyFinancialReports.Add(existingReport);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var report = await _reportingService.GenerateMonthlyReportAsync(_testUserId, reportMonth.Year, reportMonth.Month, forceRecalculate: true);
+
+        // Assert - Should recalculate with current data
+        report.Should().NotBeNull();
+        report.Id.Should().Be(existingReport.Id);
+        report.TotalEarned.Should().BeGreaterThan(0);  // Recalculated from transactions
+        report.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+
+        // Verify database was updated
+        var updatedReport = await _context.MonthlyFinancialReports.FindAsync(existingReport.Id);
+        updatedReport!.TotalEarned.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task GenerateQuarterlyReportAsync_ValidData_ShouldAggregateThreeMonths()
+    {
+        // Arrange - Create monthly reports for Q1 2024
+        for (int month = 1; month <= 3; month++)
+        {
+            var monthlyReport = new MonthlyFinancialReport
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                Year = 2024,
+                Month = month,
+                TotalEarned = 1000,
+                TotalSpent = 300,
+                NetBalance = 700,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.MonthlyFinancialReports.Add(monthlyReport);
+        }
+        await _context.SaveChangesAsync();
+
+        // Act
+        var report = await _reportingService.GenerateQuarterlyReportAsync(_testUserId, 2024, 1);
+
+        // Assert - Should aggregate 3 months
+        report.Should().NotBeNull();
+        report.UserId.Should().Be(_testUserId);
+        report.Year.Should().Be(2024);
+        report.Quarter.Should().Be(1);
+        report.TotalEarned.Should().Be(3000);  // 1000 * 3
+        report.TotalSpent.Should().Be(900);    // 300 * 3
+        report.NetBalance.Should().Be(2100);   // 700 * 3
+
+        // Verify saved to database
+        var savedReport = await _context.QuarterlyFinancialReports
+            .FirstOrDefaultAsync(r => r.UserId == _testUserId && r.Year == 2024 && r.Quarter == 1);
+        savedReport.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GenerateAnnualReportAsync_ValidData_ShouldAggregateTwelveMonths()
+    {
+        // Arrange - Create monthly reports for entire year
+        for (int month = 1; month <= 12; month++)
+        {
+            var monthlyReport = new MonthlyFinancialReport
+            {
+                Id = Guid.NewGuid(),
+                UserId = _testUserId,
+                Year = 2024,
+                Month = month,
+                TotalEarned = 500,
+                TotalSpent = 200,
+                NetBalance = 300,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.MonthlyFinancialReports.Add(monthlyReport);
+        }
+        await _context.SaveChangesAsync();
+
+        // Act
+        var report = await _reportingService.GenerateAnnualReportAsync(_testUserId, 2024);
+
+        // Assert - Should aggregate 12 months
+        report.Should().NotBeNull();
+        report.UserId.Should().Be(_testUserId);
+        report.Year.Should().Be(2024);
+        report.TotalEarned.Should().Be(6000);  // 500 * 12
+        report.TotalSpent.Should().Be(2400);   // 200 * 12
+        report.NetBalance.Should().Be(3600);   // 300 * 12
+
+        // Verify saved to database
+        var savedReport = await _context.AnnualFinancialReports
+            .FirstOrDefaultAsync(r => r.UserId == _testUserId && r.Year == 2024);
+        savedReport.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetRealTimeAnalyticsAsync_ValidRequest_ShouldReturnAnalyticsData()
+    {
+        // Arrange
+        var request = new AnalyticsRequest
+        {
+            UserId = _testUserId,
+            StartDate = _testStartDate,
+            EndDate = _testEndDate,
+            IncludeProjections = true
+        };
+
+        // Act
+        var analytics = await _reportingService.GetRealTimeAnalyticsAsync(request);
+
+        // Assert
+        analytics.Should().NotBeNull();
+        analytics.UserId.Should().Be(_testUserId);
+        analytics.TotalEarnings.Should().BeGreaterThan(0);
+        analytics.TransactionCount.Should().BeGreaterThan(0);
+        analytics.GeneratedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task GetUserDashboardDataAsync_ValidUserId_ShouldReturnDashboardData()
+    {
+        // Act
+        var dashboardData = await _reportingService.GetUserDashboardDataAsync(_testUserId);
+
+        // Assert
+        dashboardData.Should().NotBeNull();
+        dashboardData.CurrentBalance.Should().Be(3000);
+        dashboardData.RecentTransactionsCount.Should().BeGreaterThan(0);
+        dashboardData.TotalEarned.Should().Be(5000);
+        dashboardData.TotalSpent.Should().Be(2000);
+    }
+
+    [Fact]
+    public async Task GetSpendingEarningAnalyticsAsync_ValidParameters_ShouldReturnBreakdown()
+    {
+        // Act
+        var analytics = await _reportingService.GetSpendingEarningAnalyticsAsync(
+            _testUserId,
+            _testStartDate,
+            _testEndDate);
+
+        // Assert
+        analytics.Should().NotBeNull();
+        analytics.TotalEarnings.Should().Be(5000);
+        analytics.TotalSpending.Should().Be(2000);
+        analytics.NetChange.Should().Be(3000);
+        analytics.EarningsByCategory.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExportFinancialDataAsync_WithCsvFormat_ShouldReturnCsvExport()
+    {
+        // Arrange
+        _exportService.SetupSuccess();
+        var request = new FinancialExportRequest
+        {
+            UserId = _testUserId,
+            Format = ExportFormat.Csv,
+            StartDate = _testStartDate,
+            EndDate = _testEndDate
+        };
+
+        // Act
+        var result = await _reportingService.ExportFinancialDataAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+        result.Format.Should().Be(ExportFormat.Csv);
+        result.Content.Should().NotBeNullOrEmpty();
+
+        // Verify audit log
+        var auditLog = await _context.AuditLogs
+            .FirstOrDefaultAsync(a => a.UserId == _testUserId && a.Action == "ExportFinancialData");
+        auditLog.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task ExportTransactionHistoryAsCsvAsync_ValidParameters_ShouldReturnCsv()
+    {
+        // Arrange
+        _exportService.SetupSuccess();
+
+        // Act
+        var csv = await _reportingService.ExportTransactionHistoryAsCsvAsync(
+            _testUserId,
+            _testStartDate,
+            _testEndDate);
+
+        // Assert
+        csv.Should().NotBeNullOrEmpty();
+        csv.Should().Contain("TransactionId");  // CSV header
+        csv.Should().Contain("Amount");
+    }
+
+    [Fact]
+    public async Task ExportCreditSummaryAsPdfAsync_ValidParameters_ShouldReturnPdf()
+    {
+        // Arrange
+        _exportService.SetupSuccess();
+        var request = new CreditReportRequest
+        {
+            UserId = _testUserId,
+            StartDate = _testStartDate,
+            EndDate = _testEndDate,
+            PeriodType = ReportPeriodType.Annual
+        };
+
+        // Act
+        var pdfBytes = await _reportingService.ExportCreditSummaryAsPdfAsync(request);
+
+        // Assert
+        pdfBytes.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task ExportFinancialDataAsJsonAsync_ValidParameters_ShouldReturnJson()
+    {
+        // Arrange
+        _exportService.SetupSuccess();
+
+        // Act
+        var json = await _reportingService.ExportFinancialDataAsJsonAsync(
+            _testUserId,
+            _testStartDate,
+            _testEndDate);
+
+        // Assert
+        json.Should().NotBeNullOrEmpty();
+        json.Should().Contain("{");  // Valid JSON structure
+        json.Should().Contain("}");
+    }
+
+    [Fact]
+    public async Task GetCategorizedTransactionBreakdownAsync_ValidParameters_ShouldReturnBreakdown()
+    {
+        // Act
+        var breakdown = await _reportingService.GetCategorizedTransactionBreakdownAsync(
+            _testUserId,
+            _testStartDate,
+            _testEndDate);
+
+        // Assert
+        breakdown.Should().NotBeNull();
+        breakdown.Should().NotBeEmpty();
+        breakdown.Should().Contain(b => b.Category == "ProjectEarnings");
+        breakdown.Should().Contain(b => b.Category == "Purchase");
+    }
+
+    [Fact]
+    public async Task GetProjectEarningsBreakdownAsync_ValidParameters_ShouldReturnBreakdown()
+    {
+        // Arrange - Create project for testing
+        var project = new Project
+        {
+            Id = Guid.NewGuid(),
+            ClientId = _testUserId,
+            Title = "Test Project",
+            Description = "Project for earnings test",
+            CreditBudget = 1000,
+            Status = ProjectStatus.Completed,
+            CreatedAt = _testStartDate
+        };
+        _context.Projects.Add(project);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var breakdown = await _reportingService.GetProjectEarningsBreakdownAsync(
+            _testUserId,
+            _testStartDate,
+            _testEndDate);
+
+        // Assert
+        breakdown.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task SetupBudgetTrackingAsync_ValidRequest_ShouldReturnSuccess()
+    {
+        // Arrange
+        var request = new BudgetSetupRequest
+        {
+            UserId = _testUserId,
+            MonthlyBudget = 2000,
+            Category = "ProjectEarnings",
+            AlertThreshold = 80  // Alert at 80% of budget
+        };
+
+        // Act
+        var result = await _reportingService.SetupBudgetTrackingAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Success.Should().BeTrue();
+        result.BudgetId.Should().NotBeNull();
+
+        // Verify budget saved to database
+        var savedBudget = await _context.BudgetTracking
+            .FirstOrDefaultAsync(b => b.UserId == _testUserId);
+        savedBudget.Should().NotBeNull();
+        savedBudget!.MonthlyBudget.Should().Be(2000);
+    }
+
+    [Fact]
+    public async Task GetGoalTrackingProgressAsync_ValidUserId_ShouldReturnProgress()
+    {
+        // Arrange - Create a financial goal
+        var goal = new FinancialGoal
+        {
+            Id = Guid.NewGuid(),
+            UserId = _testUserId,
+            GoalName = "Save 10000 credits",
+            TargetAmount = 10000,
+            CurrentAmount = 3000,
+            TargetDate = DateTime.UtcNow.AddMonths(6),
+            Status = GoalStatus.InProgress,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.FinancialGoals.Add(goal);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var progress = await _reportingService.GetGoalTrackingProgressAsync(_testUserId);
+
+        // Assert
+        progress.Should().NotBeNull();
+        progress.Should().HaveCount(1);
+        progress.First().GoalName.Should().Be("Save 10000 credits");
+        progress.First().ProgressPercentage.Should().Be(30);  // 3000 / 10000 = 30%
+    }
+
+    [Fact]
+    public async Task UpdateUserGoalsAsync_ValidParameters_ShouldReturnTrue()
+    {
+        // Arrange - Create a financial goal
+        var goal = new FinancialGoal
+        {
+            Id = Guid.NewGuid(),
+            UserId = _testUserId,
+            GoalName = "Initial goal",
+            TargetAmount = 5000,
+            CurrentAmount = 1000,
+            TargetDate = DateTime.UtcNow.AddMonths(3),
+            Status = GoalStatus.InProgress,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.FinancialGoals.Add(goal);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await _reportingService.UpdateUserGoalsAsync(goal.Id, 2500);
+
+        // Assert
+        result.Should().BeTrue();
+
+        // Verify goal updated in database
+        var updatedGoal = await _context.FinancialGoals.FindAsync(goal.Id);
+        updatedGoal!.CurrentAmount.Should().Be(2500);
+    }
+
+    [Fact]
+    public async Task CheckBudgetGoalAlertsAsync_WithBudgetExceeded_ShouldReturnAlerts()
+    {
+        // Arrange - Create budget with low threshold
+        var budget = new BudgetTracking
+        {
+            Id = Guid.NewGuid(),
+            UserId = _testUserId,
+            MonthlyBudget = 1000,
+            CurrentSpending = 900,  // 90% of budget
+            AlertThreshold = 80,
+            Month = DateTime.UtcNow.Month,
+            Year = DateTime.UtcNow.Year,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.BudgetTracking.Add(budget);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var alerts = await _reportingService.CheckBudgetGoalAlertsAsync(_testUserId);
+
+        // Assert
+        alerts.Should().NotBeNull();
+        alerts.Should().NotBeEmpty();
+        alerts.Should().Contain(a => a.Type == "warning");
+    }
+
+    public void Dispose()
+    {
+        _context.Database.EnsureDeleted();
+        _context.Dispose();
+    }
+}

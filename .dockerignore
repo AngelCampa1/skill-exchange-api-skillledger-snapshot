@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Web frontend (built separately)
+web/
+.playwright-mcp/
+
+# Test projects
+tests/
+*.Tests/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.user
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# Artifacts
+artifacts/
+.playwright-mcp/
+
+# Screenshots and images (test artifacts)
+*.png
+!web/public/**/*.png
+!assets/**/*.png
+
+# Node modules (if any leaked)
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db

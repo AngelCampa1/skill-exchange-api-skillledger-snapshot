@@ -1,0 +1,438 @@
+using Microsoft.Extensions.DependencyInjection;
+using SkillLedger.Core.DTOs;
+using SkillLedger.Core.Enums;
+using SkillLedger.Core.Entities;
+using SkillLedger.Core.Interfaces;
+using SkillLedger.Tests.Infrastructure;
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using Xunit;
+
+namespace SkillLedger.Tests.Integration;
+
+/// <summary>
+/// Integration tests for Financial Reporting API endpoints
+/// Tests US-3.4.1: Financial Reporting & Analytics implementation
+/// </summary>
+[Collection("IntegrationTestCollection")]
+public class FinancialReportingApiIntegrationTests : IntegrationTestBase
+{
+    private readonly JsonSerializerOptions _jsonOptions;
+
+    public FinancialReportingApiIntegrationTests(SharedTestWebApplicationFactory factory) 
+        : base(factory)
+    {
+        _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+    }
+
+    #region Service Integration Tests (Backend Logic)
+
+    [Fact]
+    public async Task FinancialReportingService_GenerateCreditSummaryReport_ReturnsValidReport()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("test@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+        
+        // Create test transactions
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var request = new CreditReportRequest
+        {
+            UserId = user.Id,
+            PeriodType = ReportPeriodType.Monthly,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            EndDate = DateTime.UtcNow,
+            IncludeTransactionDetails = true,
+            IncludeProjectBreakdown = true
+        };
+
+        // Act
+        var report = await financialReportingService.GenerateCreditSummaryReportAsync(request);
+
+        // Assert
+        Assert.NotNull(report);
+        Assert.Equal(user.Id, report.UserId);
+        Assert.NotNull(report.Summary);
+        Assert.NotNull(report.Period);
+        Assert.True(report.Summary.TransactionCount > 0);
+        Assert.True(report.GeneratedAt > DateTime.MinValue);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_GetUserDashboardData_ReturnsValidDashboard()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("dashboard@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        // Create test data
+        await CreateTestCreditWalletAsync(user.Id, 5000);
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        // Act
+        var dashboard = await financialReportingService.GetUserDashboardDataAsync(user.Id);
+
+        // Assert
+        Assert.NotNull(dashboard);
+        Assert.Equal(user.Id, dashboard.UserId);
+        Assert.NotNull(dashboard.Wallet);
+        Assert.NotNull(dashboard.MonthlyStats);
+        Assert.NotNull(dashboard.Goals);
+        Assert.True(dashboard.Wallet.CurrentBalance > 0);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_GetRealTimeAnalytics_ReturnsValidAnalytics()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("analytics@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var request = new AnalyticsRequest
+        {
+            UserId = user.Id,
+            PeriodType = ReportPeriodType.Monthly,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        // Act
+        var analytics = await financialReportingService.GetRealTimeAnalyticsAsync(request);
+
+        // Assert
+        Assert.NotNull(analytics);
+        Assert.Equal(user.Id, analytics.UserId);
+        Assert.NotNull(analytics.CurrentBalance);
+        Assert.NotNull(analytics.Spending);
+        Assert.NotNull(analytics.Earnings);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_ExportFinancialData_CSV_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("export@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var request = new FinancialExportRequest
+        {
+            UserId = user.Id,
+            Format = ExportFormat.CSV,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            EndDate = DateTime.UtcNow,
+            IncludePersonalInfo = false
+        };
+
+        // Act
+        var exportResult = await financialReportingService.ExportFinancialDataAsync(request);
+
+        // Assert
+        Assert.NotNull(exportResult);
+        Assert.True(exportResult.Success);
+        Assert.Equal("text/csv", exportResult.ContentType);
+        Assert.NotNull(exportResult.Content);
+        Assert.Contains(".csv", exportResult.FileName);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_ExportFinancialData_PDF_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("exportpdf@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var request = new FinancialExportRequest
+        {
+            UserId = user.Id,
+            Format = ExportFormat.PDF,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        // Act
+        var exportResult = await financialReportingService.ExportFinancialDataAsync(request);
+
+        // Assert
+        Assert.NotNull(exportResult);
+        Assert.True(exportResult.Success);
+        Assert.Equal("application/pdf", exportResult.ContentType);
+        Assert.NotNull(exportResult.Content);
+        Assert.Contains(".pdf", exportResult.FileName);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_ExportFinancialData_JSON_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("exportjson@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var request = new FinancialExportRequest
+        {
+            UserId = user.Id,
+            Format = ExportFormat.JSON,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        // Act
+        var exportResult = await financialReportingService.ExportFinancialDataAsync(request);
+
+        // Assert
+        Assert.NotNull(exportResult);
+        Assert.True(exportResult.Success);
+        Assert.Equal("application/json", exportResult.ContentType);
+        Assert.NotNull(exportResult.Content);
+        Assert.Contains(".json", exportResult.FileName);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_ExportFinancialData_XML_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("exportxml@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var request = new FinancialExportRequest
+        {
+            UserId = user.Id,
+            Format = ExportFormat.XML,
+            StartDate = DateTime.UtcNow.AddMonths(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        // Act
+        var exportResult = await financialReportingService.ExportFinancialDataAsync(request);
+
+        // Assert
+        Assert.NotNull(exportResult);
+        Assert.True(exportResult.Success);
+        Assert.Equal("application/xml", exportResult.ContentType);
+        Assert.NotNull(exportResult.Content);
+        Assert.Contains(".xml", exportResult.FileName);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_GetGoalTrackingProgress_ReturnsValidData()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("goals@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        // Act
+        var goalData = await financialReportingService.GetGoalTrackingProgressAsync(user.Id);
+
+        // Assert
+        Assert.NotNull(goalData);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_GetCategorizedTransactionBreakdown_ReturnsValidData()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("breakdown@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        await CreateTestCreditTransactionsAsync(user.Id);
+
+        var startDate = DateTime.UtcNow.AddMonths(-1);
+        var endDate = DateTime.UtcNow;
+
+        // Act
+        var breakdown = await financialReportingService.GetCategorizedTransactionBreakdownAsync(
+            user.Id, startDate, endDate);
+
+        // Assert
+        Assert.NotNull(breakdown);
+        Assert.True(breakdown.Count >= 0);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_GetHistoricalTrendData_ReturnsValidData()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("trends@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        // Act
+        var trends = await financialReportingService.GetHistoricalTrendDataAsync(user.Id, 6);
+
+        // Assert
+        Assert.NotNull(trends);
+        Assert.True(trends.Count >= 0);
+    }
+
+    [Fact]
+    public async Task FinancialReportingService_GenerateActivityInsights_ReturnsValidData()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("insights@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        // Act
+        var insights = await financialReportingService.GenerateActivityInsightsAsync(user.Id, 30);
+
+        // Assert
+        Assert.NotNull(insights);
+    }
+
+    #endregion
+
+    #region Export Service Integration Tests
+
+    [Fact]
+    public async Task FinancialExportService_ExportToCsv_ReturnsValidContent()
+    {
+        // Arrange
+        var exportService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialExportService>();
+        var user = await CreateTestUserAsync("csvtest@example.com", "TestPassword123!");
+        
+        await CreateTestCreditTransactionsAsync(user.Id);
+        var transactions = await GetTestTransactionSummaries(user.Id);
+
+        // Act
+        var csvContent = await exportService.ExportToCsvAsync(transactions);
+
+        // Assert
+        Assert.NotNull(csvContent);
+        Assert.Contains("Date,Type,Amount,Description", csvContent);
+        Assert.True(csvContent.Length > 100); // Should have substantial content
+    }
+
+    [Fact]
+    public async Task FinancialExportService_ExportToJson_ReturnsValidContent()
+    {
+        // Arrange
+        var exportService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialExportService>();
+        var testData = new { TestValue = "Test", Number = 123 };
+
+        // Act
+        var jsonContent = await exportService.ExportToJsonAsync(testData);
+
+        // Assert
+        Assert.NotNull(jsonContent);
+        Assert.Contains("testValue", jsonContent); // camelCase
+        Assert.Contains("123", jsonContent);
+    }
+
+    [Fact]
+    public async Task FinancialExportService_ExportToXml_ReturnsValidContent()
+    {
+        // Arrange
+        var exportService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialExportService>();
+        var testData = new { TestValue = "Test", Number = 123 };
+
+        // Act
+        var xmlContent = await exportService.ExportToXmlAsync(testData);
+
+        // Assert
+        Assert.NotNull(xmlContent);
+        Assert.Contains("<?xml version=\"1.0\"", xmlContent);
+        Assert.Contains("<FinancialData>", xmlContent);
+        Assert.Contains("Test", xmlContent);
+    }
+
+    #endregion
+
+    #region Budget and Goal Tests
+
+    [Fact]
+    public async Task FinancialReportingService_SetupBudgetTracking_Success()
+    {
+        // Arrange
+        var user = await CreateTestUserAsync("budget@example.com", "TestPassword123!");
+        var financialReportingService = ServiceScope.ServiceProvider.GetRequiredService<IFinancialReportingService>();
+
+        var request = new BudgetTrackingRequest
+        {
+            UserId = user.Id,
+            MonthlySpendingLimit = 10000,
+            MonthlyEarningGoal = 15000,
+            ProjectCompletionGoal = 5
+        };
+
+        // Act
+        var result = await financialReportingService.SetupBudgetTrackingAsync(request);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private async Task CreateTestCreditTransactionsAsync(Guid userId)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var creditWalletService = scope.ServiceProvider.GetRequiredService<ICreditWalletService>();
+
+        // Create some test transactions
+        for (int i = 0; i < 5; i++)
+        {
+            await creditWalletService.AddCreditsAsync(userId, 1000 + (i * 100), 
+                CreditTransactionType.ProjectPayment, $"Test transaction {i + 1}", Guid.NewGuid());
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            await creditWalletService.DeductCreditsAsync(userId, 200 + (i * 50), 
+                CreditTransactionType.PlatformFee, $"Test spending {i + 1}", Guid.NewGuid());
+        }
+    }
+
+    private async Task CreateTestCreditWalletAsync(Guid userId, int initialBalance)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var creditWalletService = scope.ServiceProvider.GetRequiredService<ICreditWalletService>();
+
+        await creditWalletService.CreateWalletAsync(userId);
+        if (initialBalance > 0)
+        {
+            await creditWalletService.AddCreditsAsync(userId, initialBalance, 
+                CreditTransactionType.StartingCredit, "Initial balance", Guid.NewGuid());
+        }
+    }
+
+    private async Task<List<TransactionSummary>> GetTestTransactionSummaries(Guid userId)
+    {
+        // Create some test transaction summaries for export testing
+        var transactions = new List<TransactionSummary>();
+        
+        for (int i = 0; i < 5; i++)
+        {
+            transactions.Add(new TransactionSummary
+            {
+                TransactionId = Guid.NewGuid(),
+                Type = CreditTransactionType.ProjectPayment,
+                Amount = 1000 + (i * 100),
+                Description = $"Test transaction {i + 1}",
+                CreatedAt = DateTime.UtcNow.AddDays(-i),
+                Status = "Completed",
+                IsIncoming = true,
+                ProjectId = Guid.NewGuid(),
+                ProjectTitle = $"Test Project {i + 1}"
+            });
+        }
+
+        return transactions;
+    }
+
+    #endregion
+}

@@ -1,0 +1,4 @@
+/blog/* /resources/:splat 301
+/skills/* /categories/:splat 301
+/barter /resources/how-barter-exchange-works 301
+/cities /skill-exchange 301

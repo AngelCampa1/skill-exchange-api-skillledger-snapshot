@@ -1,0 +1,697 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Stripe;
+using Microsoft.EntityFrameworkCore;
+using SkillLedger.Core.Entities;
+using SkillLedger.Core.Enums;
+using SkillLedger.Core.Interfaces;
+using SkillLedger.Infrastructure.Configuration;
+using SkillLedger.Infrastructure.Data;
+using CorePaymentMethod = SkillLedger.Core.Entities.PaymentMethod;
+
+namespace SkillLedger.Infrastructure.Services;
+
+/// <summary>
+/// Stripe-specific payment service implementation
+/// </summary>
+public class StripePaymentService : IPaymentService
+{
+    private readonly ILogger<StripePaymentService> _logger;
+    private readonly StripeSettings _stripeSettings;
+    private readonly SkillLedgerDbContext _context;
+    private readonly IAuditLogService _auditLogService;
+
+    public StripePaymentService(
+        ILogger<StripePaymentService> logger,
+        IOptions<StripeSettings> stripeSettings,
+        SkillLedgerDbContext context,
+        IAuditLogService auditLogService)
+    {
+        _logger = logger;
+        _stripeSettings = stripeSettings.Value;
+        _context = context;
+        _auditLogService = auditLogService;
+
+        // Configure Stripe
+        StripeConfiguration.ApiKey = _stripeSettings.SecretKey;
+    }
+
+    public async Task<CorePaymentMethod> CreatePaymentMethodAsync(
+        Guid userId,
+        string provider,
+        string paymentMethodToken,
+        bool isDefault = false,
+        string? createdFromIP = null)
+    {
+        try
+        {
+            // For Stripe, the paymentMethodToken should be a Stripe Payment Method ID
+            var stripePaymentMethodService = new PaymentMethodService();
+            var stripePaymentMethod = await stripePaymentMethodService.GetAsync(paymentMethodToken);
+
+            // If this should be default, unset other defaults
+            if (isDefault)
+            {
+                var existingDefaults = await _context.PaymentMethods
+                    .Where(pm => pm.UserId == userId && pm.IsDefault)
+                    .ToListAsync();
+
+                foreach (var existing in existingDefaults)
+                {
+                    existing.IsDefault = false;
+                }
+            }
+
+            // Format expiry date as MM/YYYY
+            string? expiryDate = null;
+            if (stripePaymentMethod.Card?.ExpMonth.HasValue == true && stripePaymentMethod.Card?.ExpYear.HasValue == true)
+            {
+                expiryDate = $"{stripePaymentMethod.Card.ExpMonth.Value:D2}/{stripePaymentMethod.Card.ExpYear.Value}";
+            }
+
+            var paymentMethod = new CorePaymentMethod
+            {
+                UserId = userId,
+                Provider = provider,
+                Type = stripePaymentMethod.Type,
+                Token = stripePaymentMethod.Id,
+                Last4Digits = stripePaymentMethod.Card?.Last4 ?? string.Empty,
+                Brand = stripePaymentMethod.Card?.Brand?.ToLower() ?? string.Empty,
+                ExpiryDate = expiryDate,
+                CardholderName = stripePaymentMethod.BillingDetails?.Name,
+                BillingCountry = stripePaymentMethod.BillingDetails?.Address?.Country,
+                BillingPostalCode = stripePaymentMethod.BillingDetails?.Address?.PostalCode,
+                IsDefault = isDefault,
+                IsValid = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.PaymentMethods.Add(paymentMethod);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Created payment method {PaymentMethodId} for user {UserId}", paymentMethod.Id, userId);
+            return paymentMethod;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating payment method for user {UserId} with token {Token}", userId, paymentMethodToken);
+            throw;
+        }
+    }
+
+    public async Task<CorePaymentMethod?> GetPaymentMethodAsync(Guid paymentMethodId, Guid userId)
+    {
+        try
+        {
+            return await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.Id == paymentMethodId && pm.UserId == userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving payment method {PaymentMethodId} for user {UserId}", paymentMethodId, userId);
+            return null;
+        }
+    }
+
+    public async Task<List<CorePaymentMethod>> GetUserPaymentMethodsAsync(Guid userId)
+    {
+        try
+        {
+            return await _context.PaymentMethods
+                .Where(pm => pm.UserId == userId && pm.IsValid)
+                .OrderByDescending(pm => pm.IsDefault)
+                .ThenByDescending(pm => pm.CreatedAt)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving payment methods for user {UserId}", userId);
+            return new List<CorePaymentMethod>();
+        }
+    }
+
+    public async Task<CorePaymentMethod> SetDefaultPaymentMethodAsync(
+        Guid paymentMethodId,
+        Guid userId,
+        string? createdFromIP = null)
+    {
+        try
+        {
+            // Get the payment method to set as default
+            var paymentMethod = await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.Id == paymentMethodId && pm.UserId == userId)
+                ?? throw new InvalidOperationException("Payment method not found");
+
+            // Unset all other defaults for this user
+            var otherDefaults = await _context.PaymentMethods
+                .Where(pm => pm.UserId == userId && pm.Id != paymentMethodId && pm.IsDefault)
+                .ToListAsync();
+
+            foreach (var other in otherDefaults)
+            {
+                other.IsDefault = false;
+            }
+
+            // Set this as default
+            paymentMethod.IsDefault = true;
+            paymentMethod.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Set payment method {PaymentMethodId} as default for user {UserId}", paymentMethodId, userId);
+            return paymentMethod;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting default payment method {PaymentMethodId} for user {UserId}", paymentMethodId, userId);
+            throw;
+        }
+    }
+
+    public async Task<bool> RemovePaymentMethodAsync(
+        Guid paymentMethodId,
+        Guid userId,
+        string? createdFromIP = null)
+    {
+        try
+        {
+            var paymentMethod = await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.Id == paymentMethodId && pm.UserId == userId);
+
+            if (paymentMethod == null)
+            {
+                return false;
+            }
+
+            // Don't allow removing if it's being used by active subscriptions
+            var activeSubscriptions = await _context.UserSubscriptions
+                .Include(us => us.SubscriptionTier)
+                .Where(us => us.UserId == userId &&
+                           us.Status == SubscriptionStatus.Active &&
+                           us.DefaultPaymentMethodId == paymentMethodId)
+                .AnyAsync();
+
+            if (activeSubscriptions)
+            {
+                throw new InvalidOperationException("Cannot remove payment method used by active subscriptions");
+            }
+
+            // Remove from Stripe
+            if (!string.IsNullOrEmpty(paymentMethod.Token))
+            {
+                try
+                {
+                    var paymentMethodService = new PaymentMethodService();
+                    await paymentMethodService.DetachAsync(paymentMethod.Token);
+                }
+                catch (StripeException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to detach payment method from Stripe: {PaymentMethodId}", paymentMethod.Token);
+                }
+            }
+
+            _context.PaymentMethods.Remove(paymentMethod);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Removed payment method {PaymentMethodId} for user {UserId}", paymentMethodId, userId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing payment method {PaymentMethodId} for user {UserId}", paymentMethodId, userId);
+            throw;
+        }
+    }
+
+    public async Task<PaymentResult> ProcessSubscriptionPaymentAsync(
+        Guid subscriptionId,
+        decimal amount,
+        string currency = "USD",
+        string? description = null,
+        string? createdFromIP = null)
+    {
+        try
+        {
+            var subscription = await _context.UserSubscriptions
+                .Include(us => us.SubscriptionTier)
+                .FirstOrDefaultAsync(us => us.Id == subscriptionId)
+                ?? throw new InvalidOperationException("Subscription not found");
+
+            if (subscription.DefaultPaymentMethodId == null)
+            {
+                return new PaymentResult
+                {
+                    Success = false,
+                    ErrorMessage = "No default payment method set",
+                    Status = TransactionStatus.Failed
+                };
+            }
+
+            var paymentMethod = await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.Id == subscription.DefaultPaymentMethodId.Value && pm.UserId == subscription.UserId)
+                ?? throw new InvalidOperationException("Default payment method not found");
+
+            // Create Stripe customer if needed
+            var externalCustomerId = await GetOrCreateStripeCustomer(subscription.UserId);
+
+            // Create payment intent
+            var options = new PaymentIntentCreateOptions
+            {
+                Amount = (long)(amount * 100),
+                Currency = currency.ToLower(),
+                Customer = externalCustomerId,
+                PaymentMethod = paymentMethod.Token,
+                Confirm = true,
+                Description = description ?? $"Subscription payment for {subscription.SubscriptionTier?.Name}",
+                Metadata = new Dictionary<string, string>
+                {
+                    ["subscription_id"] = subscriptionId.ToString(),
+                    ["user_id"] = subscription.UserId.ToString()
+                }
+            };
+
+            var service = new PaymentIntentService();
+            var paymentIntent = await service.CreateAsync(options);
+
+            if (paymentIntent.Status == "succeeded")
+            {
+                // Create transaction record
+                var transaction = new SubscriptionTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    UserSubscriptionId = subscriptionId,
+                    Amount = amount,
+                    Currency = currency,
+                    Status = TransactionStatus.Completed,
+                    ExternalTransactionId = paymentIntent.Id,
+                    TransactionType = TransactionType.Payment,
+                    Description = description,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedFromIP = createdFromIP
+                };
+
+                _context.SubscriptionTransactions.Add(transaction);
+                await _context.SaveChangesAsync();
+
+                return new PaymentResult
+                {
+                    Success = true,
+                    Transaction = transaction,
+                    ExternalTransactionId = paymentIntent.Id,
+                    Status = TransactionStatus.Completed
+                };
+            }
+            else
+            {
+                return new PaymentResult
+                {
+                    Success = false,
+                    ErrorMessage = paymentIntent.LastPaymentError?.Message ?? "Payment failed",
+                    Status = TransactionStatus.Failed,
+                    RequiresAction = paymentIntent.Status == "requires_action",
+                    ClientSecret = paymentIntent.ClientSecret
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing subscription payment for subscription {SubscriptionId}", subscriptionId);
+            return new PaymentResult
+            {
+                Success = false,
+                ErrorMessage = "Payment processing failed",
+                Status = TransactionStatus.Failed
+            };
+        }
+    }
+
+    public async Task<PaymentResult> ProcessOneTimePaymentAsync(
+        Guid userId,
+        Guid paymentMethodId,
+        decimal amount,
+        string currency = "USD",
+        string? description = null,
+        string? createdFromIP = null)
+    {
+        try
+        {
+            var paymentMethod = await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.Id == paymentMethodId && pm.UserId == userId)
+                ?? throw new InvalidOperationException("Payment method not found");
+
+            var externalCustomerId = await GetOrCreateStripeCustomer(userId);
+
+            var options = new PaymentIntentCreateOptions
+            {
+                Amount = (long)(amount * 100),
+                Currency = currency.ToLower(),
+                Customer = externalCustomerId,
+                PaymentMethod = paymentMethod.Token,
+                Confirm = true,
+                Description = description,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["user_id"] = userId.ToString(),
+                    ["payment_method_id"] = paymentMethodId.ToString()
+                }
+            };
+
+            var service = new PaymentIntentService();
+            var paymentIntent = await service.CreateAsync(options);
+
+            if (paymentIntent.Status == "succeeded")
+            {
+                // Create transaction record (without subscription)
+                var transaction = new SubscriptionTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    Amount = amount,
+                    Currency = currency,
+                    Status = TransactionStatus.Completed,
+                    ExternalTransactionId = paymentIntent.Id,
+                    TransactionType = TransactionType.Payment,
+                    Description = description,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedFromIP = createdFromIP
+                };
+
+                _context.SubscriptionTransactions.Add(transaction);
+                await _context.SaveChangesAsync();
+
+                return new PaymentResult
+                {
+                    Success = true,
+                    Transaction = transaction,
+                    ExternalTransactionId = paymentIntent.Id,
+                    Status = TransactionStatus.Completed
+                };
+            }
+            else
+            {
+                return new PaymentResult
+                {
+                    Success = false,
+                    ErrorMessage = paymentIntent.LastPaymentError?.Message ?? "Payment failed",
+                    Status = TransactionStatus.Failed,
+                    RequiresAction = paymentIntent.Status == "requires_action",
+                    ClientSecret = paymentIntent.ClientSecret
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing one-time payment for user {UserId}", userId);
+            return new PaymentResult
+            {
+                Success = false,
+                ErrorMessage = "Payment processing failed",
+                Status = TransactionStatus.Failed
+            };
+        }
+    }
+
+    public async Task<RefundResult> RefundPaymentAsync(
+        Guid transactionId,
+        decimal? amount = null,
+        string? reason = null,
+        string? createdFromIP = null)
+    {
+        try
+        {
+            var transaction = await _context.SubscriptionTransactions
+                .FirstOrDefaultAsync(t => t.Id == transactionId)
+                ?? throw new InvalidOperationException("Transaction not found");
+
+            if (transaction.Status != TransactionStatus.Completed)
+            {
+                throw new InvalidOperationException("Cannot refund a non-completed transaction");
+            }
+
+            if (string.IsNullOrEmpty(transaction.ExternalTransactionId))
+            {
+                throw new InvalidOperationException("No external transaction ID for refund");
+            }
+
+            var refundOptions = new RefundCreateOptions
+            {
+                PaymentIntent = transaction.ExternalTransactionId,
+                Reason = reason switch
+                {
+                    "duplicate" => "duplicate",
+                    "fraudulent" => "fraudulent",
+                    "requested_by_customer" => "requested_by_customer",
+                    _ => null
+                }
+            };
+
+            if (amount.HasValue)
+            {
+                refundOptions.Amount = (long)(amount.Value * 100);
+            }
+
+            var refundService = new RefundService();
+            var refund = await refundService.CreateAsync(refundOptions);
+
+            // Create refund transaction record
+            var refundTransaction = new SubscriptionTransaction
+            {
+                Id = Guid.NewGuid(),
+                Amount = refund.Amount / 100m,
+                Currency = refund.Currency.ToUpper(),
+                Status = refund.Status == "succeeded" ? TransactionStatus.Completed : TransactionStatus.Failed,
+                ExternalTransactionId = refund.Id,
+                TransactionType = TransactionType.Refund,
+                Description = reason,
+                OriginalTransactionId = transactionId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedFromIP = createdFromIP
+            };
+
+            _context.SubscriptionTransactions.Add(refundTransaction);
+            await _context.SaveChangesAsync();
+
+            return new RefundResult
+            {
+                Success = refund.Status == "succeeded",
+                RefundTransaction = refundTransaction,
+                ExternalRefundId = refund.Id,
+                Status = refundTransaction.Status,
+                RefundedAmount = refund.Amount / 100m
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refunding transaction {TransactionId}", transactionId);
+            return new RefundResult
+            {
+                Success = false,
+                ErrorMessage = "Refund processing failed",
+                Status = TransactionStatus.Failed,
+                RefundedAmount = 0
+            };
+        }
+    }
+
+    public async Task<PaymentValidationResult> ValidatePaymentMethodAsync(Guid paymentMethodId, Guid userId)
+    {
+        try
+        {
+            var paymentMethod = await _context.PaymentMethods
+                .FirstOrDefaultAsync(pm => pm.Id == paymentMethodId && pm.UserId == userId);
+
+            if (paymentMethod == null)
+            {
+                return new PaymentValidationResult { IsValid = false, ErrorMessage = "Payment method not found" };
+            }
+
+            if (string.IsNullOrEmpty(paymentMethod.Token))
+            {
+                return new PaymentValidationResult { IsValid = false, ErrorMessage = "No external payment method ID" };
+            }
+
+            try
+            {
+                var service = new PaymentMethodService();
+                var stripePaymentMethod = await service.GetAsync(paymentMethod.Token);
+
+                // Check if expired
+                if (stripePaymentMethod.Card?.ExpYear.HasValue == true && stripePaymentMethod.Card?.ExpMonth.HasValue == true)
+                {
+                    var expiryDate = new DateTime(stripePaymentMethod.Card.ExpYear.Value, stripePaymentMethod.Card.ExpMonth.Value, 1);
+                    expiryDate = expiryDate.AddMonths(1).AddDays(-1); // Last day of expiry month
+
+                    if (expiryDate < DateTime.UtcNow)
+                    {
+                        return new PaymentValidationResult
+                        {
+                            IsValid = false,
+                            IsExpired = true,
+                            ExpiryDate = expiryDate,
+                            ErrorMessage = "Payment method has expired"
+                        };
+                    }
+                }
+
+                return new PaymentValidationResult
+                {
+                    IsValid = true,
+                    ExpiryDate = stripePaymentMethod.Card?.ExpYear.HasValue == true && stripePaymentMethod.Card?.ExpMonth.HasValue == true
+                        ? new DateTime(stripePaymentMethod.Card.ExpYear.Value, stripePaymentMethod.Card.ExpMonth.Value, 1)
+                        : null
+                };
+            }
+            catch (StripeException)
+            {
+                return new PaymentValidationResult
+                {
+                    IsValid = false,
+                    ErrorMessage = "Payment method is no longer valid with provider"
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating payment method {PaymentMethodId}", paymentMethodId);
+            return new PaymentValidationResult
+            {
+                IsValid = false,
+                ErrorMessage = "Validation failed"
+            };
+        }
+    }
+
+    public async Task<string> CreateExternalCustomerAsync(Guid userId, string email, string name)
+    {
+        try
+        {
+            var options = new CustomerCreateOptions
+            {
+                Email = email,
+                Name = name,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["user_id"] = userId.ToString()
+                }
+            };
+
+            var service = new CustomerService();
+            var customer = await service.CreateAsync(options);
+
+            // Store external customer ID in user metadata or separate table
+            // For now, we'll retrieve it dynamically
+
+            return customer.Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating external customer for user {UserId}", userId);
+            throw;
+        }
+    }
+
+    public async Task<bool> UpdateExternalCustomerAsync(Guid userId, string email, string name)
+    {
+        try
+        {
+            var externalCustomerId = await GetOrCreateStripeCustomer(userId);
+
+            var options = new CustomerUpdateOptions
+            {
+                Email = email,
+                Name = name
+            };
+
+            var service = new CustomerService();
+            await service.UpdateAsync(externalCustomerId, options);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating external customer for user {UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task<PaymentMethodDetails> GetPaymentMethodDetailsAsync(string paymentMethodToken, string provider)
+    {
+        try
+        {
+            if (provider.ToLower() != "stripe")
+            {
+                throw new NotSupportedException($"Provider {provider} not supported");
+            }
+
+            var service = new PaymentMethodService();
+            var stripePaymentMethod = await service.GetAsync(paymentMethodToken);
+
+            return new PaymentMethodDetails
+            {
+                Last4Digits = stripePaymentMethod.Card?.Last4 ?? string.Empty,
+                Brand = stripePaymentMethod.Card?.Brand?.ToLower() ?? string.Empty,
+                ExpiryMonth = stripePaymentMethod.Card?.ExpMonth?.ToString(),
+                ExpiryYear = stripePaymentMethod.Card?.ExpYear?.ToString(),
+                CardholderName = stripePaymentMethod.BillingDetails?.Name,
+                BillingCountry = stripePaymentMethod.BillingDetails?.Address?.Country,
+                BillingPostalCode = stripePaymentMethod.BillingDetails?.Address?.PostalCode,
+                IsValid = true,
+                ExpiryDate = stripePaymentMethod.Card?.ExpYear.HasValue == true && stripePaymentMethod.Card?.ExpMonth.HasValue == true
+                    ? new DateTime(stripePaymentMethod.Card.ExpYear.Value, stripePaymentMethod.Card.ExpMonth.Value, 1)
+                    : null
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting payment method details for token {Token}", paymentMethodToken);
+            return new PaymentMethodDetails
+            {
+                IsValid = false,
+                ErrorMessage = "Failed to retrieve payment method details"
+            };
+        }
+    }
+
+    public async Task<WebhookResult> ProcessWebhookAsync(string provider, string eventType, string eventData)
+    {
+        // This is handled by StripeWebhookService
+        return new WebhookResult
+        {
+            Success = true,
+            ProcessedEvents = { eventType }
+        };
+    }
+
+    private async Task<string> GetOrCreateStripeCustomer(Guid userId)
+    {
+        // For now, create a new customer each time or retrieve existing one
+        // In a real implementation, you'd store the external customer ID
+
+        var user = await _context.Users.FindAsync(userId)
+            ?? throw new InvalidOperationException("User not found");
+
+        try
+        {
+            // Try to find existing customer by email
+            var customerService = new CustomerService();
+            var existingCustomers = await customerService.ListAsync(new CustomerListOptions
+            {
+                Email = user.Email,
+                Limit = 1
+            });
+
+            if (existingCustomers.Any())
+            {
+                return existingCustomers.First().Id;
+            }
+
+            // Create new customer
+            return await CreateExternalCustomerAsync(userId, user.Email, $"{user.FirstName} {user.LastName}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting or creating Stripe customer for user {UserId}", userId);
+            throw;
+        }
+    }
+}

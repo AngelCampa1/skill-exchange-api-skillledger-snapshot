@@ -1,0 +1,333 @@
+using SkillLedger.Core.DTOs;
+using SkillLedger.Core.Enums;
+using SkillLedger.Core.Interfaces;
+using System.Text.Json;
+
+namespace SkillLedger.Tests.Mocks;
+
+/// <summary>
+/// Mock financial export service for testing.
+/// This mocks the EXTERNAL file generation service (OK to mock per TDD_GUIDE.md).
+/// Returns simple formatted outputs without requiring PDF/Excel/Chart libraries.
+/// </summary>
+public class MockFinancialExportService : IFinancialExportService
+{
+    private bool _shouldSucceed = true;
+    private string _errorMessage = string.Empty;
+
+    /// <summary>
+    /// Configure mock to return success (default)
+    /// </summary>
+    public void SetupSuccess()
+    {
+        _shouldSucceed = true;
+        _errorMessage = string.Empty;
+    }
+
+    /// <summary>
+    /// Configure mock to return failure
+    /// </summary>
+    public void SetupFailure(string errorMessage = "Export failed")
+    {
+        _shouldSucceed = false;
+        _errorMessage = errorMessage;
+    }
+
+    #region CSV Export
+
+    public Task<string> ExportToCsvAsync(IEnumerable<TransactionSummary> data, bool includeHeaders = true)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var csv = includeHeaders ? "TransactionId,Amount,Date,Type\n" : "";
+        csv += string.Join("\n", data.Select(t => $"{t.TransactionId},{t.Amount},{t.TransactionDate:yyyy-MM-dd},{t.TransactionType}"));
+        return Task.FromResult(csv);
+    }
+
+    public Task<string> ExportReportToCsvAsync(CreditSummaryReport report)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var csv = "Credit Summary Report\n";
+        csv += $"User ID: {report.UserId}\n";
+        csv += $"Generated At: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss}\n";
+        csv += $"Total Earned: {report.Summary.TotalEarned}\n";
+        csv += $"Total Spent: {report.Summary.TotalSpent}\n";
+        csv += $"Net Balance: {report.Summary.NetBalance}\n";
+        return Task.FromResult(csv);
+    }
+
+    public Task<string> ExportDashboardToCsvAsync(UserDashboardData dashboardData)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var csv = "User Dashboard Data\n";
+        csv += $"Total Balance: {dashboardData.CurrentBalance}\n";
+        csv += $"Recent Transactions: {dashboardData.RecentTransactionsCount}\n";
+        return Task.FromResult(csv);
+    }
+
+    #endregion
+
+    #region PDF Export
+
+    public Task<byte[]> ExportReportToPdfAsync(CreditSummaryReport report, bool includeCharts = true)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var pdfContent = $"PDF Report for User {report.UserId} - Generated {report.GeneratedAt}";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(pdfContent));
+    }
+
+    public Task<byte[]> ExportTransactionHistoryToPdfAsync(
+        Guid userId,
+        IEnumerable<TransactionSummary> transactions,
+        DateTime startDate,
+        DateTime endDate)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var pdfContent = $"PDF Transaction History for User {userId} from {startDate:yyyy-MM-dd} to {endDate:yyyy-MM-dd}";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(pdfContent));
+    }
+
+    public Task<byte[]> ExportDashboardToPdfAsync(UserDashboardData dashboardData, bool includeCharts = true)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var pdfContent = $"PDF Dashboard - Balance: {dashboardData.CurrentBalance}";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(pdfContent));
+    }
+
+    #endregion
+
+    #region JSON Export
+
+    public Task<string> ExportToJsonAsync<T>(T data, bool formatOutput = true)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var options = new JsonSerializerOptions { WriteIndented = formatOutput };
+        var json = JsonSerializer.Serialize(data, options);
+        return Task.FromResult(json);
+    }
+
+    public Task<string> ExportReportToJsonAsync(CreditSummaryReport report)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        return ExportToJsonAsync(report, true);
+    }
+
+    public Task<string> ExportAnalyticsToJsonAsync(AnalyticsData analyticsData)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        return ExportToJsonAsync(analyticsData, true);
+    }
+
+    #endregion
+
+    #region XML Export
+
+    public Task<string> ExportToXmlAsync<T>(T data, string rootElementName = "FinancialData")
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var xml = $"<{rootElementName}><Data>{data}</Data></{rootElementName}>";
+        return Task.FromResult(xml);
+    }
+
+    public Task<string> ExportReportToXmlAsync(CreditSummaryReport report)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var xml = $"<CreditSummaryReport><UserId>{report.UserId}</UserId><GeneratedAt>{report.GeneratedAt}</GeneratedAt></CreditSummaryReport>";
+        return Task.FromResult(xml);
+    }
+
+    public Task<string> ExportTransactionHistoryToXmlAsync(IEnumerable<TransactionSummary> transactions)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var xml = "<TransactionHistory>";
+        xml += string.Join("", transactions.Select(t => $"<Transaction><Id>{t.TransactionId}</Id><Amount>{t.Amount}</Amount></Transaction>"));
+        xml += "</TransactionHistory>";
+        return Task.FromResult(xml);
+    }
+
+    #endregion
+
+    #region Excel Export
+
+    public Task<byte[]> ExportReportToExcelAsync(CreditSummaryReport report, bool includeCharts = true)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var excelContent = $"Excel Report for User {report.UserId}";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(excelContent));
+    }
+
+    public Task<byte[]> ExportTransactionHistoryToExcelAsync(
+        Guid userId,
+        IEnumerable<TransactionSummary> transactions,
+        IEnumerable<TransactionCategoryBreakdown> categoryBreakdown,
+        DateTime startDate,
+        DateTime endDate)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var excelContent = $"Excel Transaction History for User {userId}";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(excelContent));
+    }
+
+    public Task<byte[]> ExportDashboardToExcelAsync(UserDashboardData dashboardData, AnalyticsData analyticsData)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var excelContent = $"Excel Dashboard for User";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(excelContent));
+    }
+
+    #endregion
+
+    #region Template Management
+
+    public Task<List<ExportTemplate>> GetAvailableTemplatesAsync(ExportFormat format)
+    {
+        var templates = new List<ExportTemplate>
+        {
+            new ExportTemplate
+            {
+                Id = "default",
+                Name = "Default Template",
+                Description = "Standard export template",
+                Format = format,
+                IsDefault = true
+            }
+        };
+        return Task.FromResult(templates);
+    }
+
+    public Task<FinancialExportResult> ExportWithTemplateAsync<T>(
+        T data,
+        string templateId,
+        Dictionary<string, object>? customParameters = null)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var result = new FinancialExportResult
+        {
+            Success = true,
+            Format = ExportFormat.Json,
+            Content = JsonSerializer.Serialize(data),
+            FileName = $"export_{DateTime.UtcNow:yyyyMMdd}.json",
+            FileSizeBytes = 1024,
+            GeneratedAt = DateTime.UtcNow
+        };
+        return Task.FromResult(result);
+    }
+
+    #endregion
+
+    #region Batch Export
+
+    public Task<BulkExportResult> ExportMultipleUsersAsync(
+        List<Guid> userIds,
+        ExportFormat format,
+        DateTime startDate,
+        DateTime endDate)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var result = new BulkExportResult
+        {
+            Success = true,
+            TotalFiles = userIds.Count,
+            TotalSizeBytes = userIds.Count * 1024,
+            ZipFileName = "bulk_export.zip",
+            ZipFileContent = "mock-zip-content-base64"
+        };
+        return Task.FromResult(result);
+    }
+
+    public Task<FinancialExportResult> ExportComprehensiveUserDataAsync(Guid userId, ExportFormat format)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var result = new FinancialExportResult
+        {
+            Success = true,
+            Format = format,
+            Content = $"Comprehensive data for user {userId}",
+            FileName = $"comprehensive_{userId}.{format.ToString().ToLower()}",
+            FileSizeBytes = 2048,
+            GeneratedAt = DateTime.UtcNow
+        };
+        return Task.FromResult(result);
+    }
+
+    #endregion
+
+    #region Validation and Formatting
+
+    public Task<ExportValidationResult> ValidateExportDataAsync<T>(T data)
+    {
+        var result = new ExportValidationResult
+        {
+            IsValid = _shouldSucceed,
+            RecordCount = 1,
+            ValidatedAt = DateTime.UtcNow
+        };
+
+        if (!_shouldSucceed)
+        {
+            result.ValidationErrors.Add(_errorMessage);
+        }
+
+        return Task.FromResult(result);
+    }
+
+    public Task<T> ApplyPrivacyFiltersAsync<T>(T data, ExportPrivacyLevel privacyLevel)
+    {
+        // Mock implementation - just returns data as-is
+        return Task.FromResult(data);
+    }
+
+    public string FormatCurrencyForExport(int amount, string currencyCode = "USD", string locale = "en-US")
+    {
+        return $"{currencyCode} {amount / 100.0:F2}";
+    }
+
+    #endregion
+
+    #region Chart and Visualization Export
+
+    public Task<byte[]> GenerateChartImageAsync<T>(T data, ChartType chartType, ChartOptions options)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var chartContent = $"Mock {chartType} chart image";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(chartContent));
+    }
+
+    public Task<byte[]> GenerateSpendingBreakdownChartAsync(
+        IEnumerable<TransactionCategoryBreakdown> categoryBreakdown,
+        ChartOptions options)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var chartContent = "Mock spending breakdown pie chart";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(chartContent));
+    }
+
+    public Task<byte[]> GenerateEarningTrendsChartAsync(IEnumerable<PeriodTrendData> trendData, ChartOptions options)
+    {
+        if (!_shouldSucceed) throw new InvalidOperationException(_errorMessage);
+
+        var chartContent = "Mock earning trends line chart";
+        return Task.FromResult(System.Text.Encoding.UTF8.GetBytes(chartContent));
+    }
+
+    #endregion
+}

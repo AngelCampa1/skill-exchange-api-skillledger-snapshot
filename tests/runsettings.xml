@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <!-- Enable parallel execution with 4 threads for better performance -->
+    <MaxCpuCount>4</MaxCpuCount>
+    <DisableParallelization>false</DisableParallelization>
+    <EnvironmentVariables>
+      <DOTNET_WATCH_RESTART_ON_RUDE_EDIT>0</DOTNET_WATCH_RESTART_ON_RUDE_EDIT>
+      <DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER>1</DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER>
+      <ASPNETCORE_ENVIRONMENT>Testing</ASPNETCORE_ENVIRONMENT>
+    </EnvironmentVariables>
+    <!-- Optimize test discovery and execution -->
+    <CollectSourceInformation>false</CollectSourceInformation>
+    <DisableAppDomain>true</DisableAppDomain>
+  </RunConfiguration>
+  <!-- Reduce timeout for faster feedback - 5 minutes instead of 10 -->
+  <TestSessionTimeout>300000</TestSessionTimeout>
+  
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <!-- Disable code coverage by default for faster execution -->
+      <!-- Enable only when explicitly needed: dotnet test with collect flag -->
+    </DataCollectors>
+  </DataCollectionRunSettings>
+  
+  <LoggerRunSettings>
+    <Loggers>
+      <Logger friendlyName="console" enabled="True">
+        <Configuration>
+          <!-- Use minimal verbosity for faster output -->
+          <Verbosity>minimal</Verbosity>
+        </Configuration>
+      </Logger>
+    </Loggers>
+  </LoggerRunSettings>
+</RunSettings>
